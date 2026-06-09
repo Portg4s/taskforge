@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: taskforge-api
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/taskforge}
+    username: ${SPRING_DATASOURCE_USERNAME:taskforge}
+    password: ${SPRING_DATASOURCE_PASSWORD:taskforge_dev_password}
+  flyway:
+    enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+server:
+  port: ${SERVER_PORT:8080}
