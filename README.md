@@ -11,7 +11,7 @@ Ce projet personnel sert à apprendre sérieusement une architecture full-stack 
 - Frontend : Angular, TypeScript, Angular Router, SCSS, Angular Material
 - Backend : Java 21, Spring Boot, Maven
 - Backend dependencies : Spring Web, Spring Data JPA, PostgreSQL Driver, Flyway, Validation, Spring Security
-- Base de données : PostgreSQL local via Docker Compose
+- Base de données : PostgreSQL 17 local via Docker Compose
 - Migrations : Flyway
 
 ## Structure
@@ -62,6 +62,13 @@ Sur Windows PowerShell :
 ```powershell
 cd backend
 .\mvnw.cmd spring-boot:run
+```
+
+Tests backend :
+
+```powershell
+cd backend
+.\mvnw.cmd test
 ```
 
 Endpoint de santé :

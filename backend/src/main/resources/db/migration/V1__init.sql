@@ -1,0 +1,2 @@
+-- Initial Flyway migration for TaskForge.
+-- Domain tables will be introduced later when the data model is defined.
