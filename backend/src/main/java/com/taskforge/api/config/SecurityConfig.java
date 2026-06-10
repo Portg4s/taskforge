@@ -20,6 +20,8 @@ public class SecurityConfig {
 						.requestMatchers("/api/health").permitAll()
 						// Temporary until JWT authentication is implemented.
 						.requestMatchers("/api/projects", "/api/projects/**").permitAll()
+						// Temporary until JWT authentication is implemented.
+						.requestMatchers("/api/boards", "/api/boards/**").permitAll()
 						// Future API endpoints stay protected until real authentication is added.
 						.anyRequest().authenticated())
 				.httpBasic(Customizer.withDefaults())
