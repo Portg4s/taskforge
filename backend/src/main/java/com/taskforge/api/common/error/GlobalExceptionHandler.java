@@ -3,6 +3,8 @@ package com.taskforge.api.common.error;
 import java.util.stream.Collectors;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +16,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+	private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)
 	@ResponseStatus(HttpStatus.BAD_REQUEST)
@@ -44,6 +48,8 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(Exception.class)
 	@ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
 	ApiErrorResponse handleUnexpectedException(Exception exception, HttpServletRequest request) {
+		log.error("Unexpected API error on {}", request.getRequestURI(), exception);
+
 		return buildErrorResponse(
 				HttpStatus.INTERNAL_SERVER_ERROR,
 				"An unexpected error occurred",
