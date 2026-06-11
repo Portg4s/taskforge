@@ -4,9 +4,11 @@ import java.util.List;
 import java.util.UUID;
 
 import com.taskforge.api.auth.DevUserProvider;
+import com.taskforge.api.board.BoardRepository;
 import com.taskforge.api.project.dto.CreateProjectRequest;
 import com.taskforge.api.project.dto.ProjectResponse;
 import com.taskforge.api.project.dto.UpdateProjectRequest;
+import com.taskforge.api.task.TaskRepository;
 import com.taskforge.api.user.User;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -17,10 +19,18 @@ import org.springframework.web.server.ResponseStatusException;
 public class ProjectService {
 
 	private final ProjectRepository projectRepository;
+	private final BoardRepository boardRepository;
+	private final TaskRepository taskRepository;
 	private final DevUserProvider devUserProvider;
 
-	public ProjectService(ProjectRepository projectRepository, DevUserProvider devUserProvider) {
+	public ProjectService(
+			ProjectRepository projectRepository,
+			BoardRepository boardRepository,
+			TaskRepository taskRepository,
+			DevUserProvider devUserProvider) {
 		this.projectRepository = projectRepository;
+		this.boardRepository = boardRepository;
+		this.taskRepository = taskRepository;
 		this.devUserProvider = devUserProvider;
 	}
 
@@ -72,6 +82,13 @@ public class ProjectService {
 	public void deleteProject(UUID id) {
 		User currentUser = devUserProvider.getCurrentUser();
 		Project project = findOwnedProject(id, currentUser);
+
+		if (taskRepository.existsByBoardProjectId(project.getId())) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "Project contains tasks and cannot be deleted");
+		}
+		if (!boardRepository.findByProjectId(project.getId()).isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "Project contains boards and cannot be deleted");
+		}
 
 		projectRepository.delete(project);
 	}

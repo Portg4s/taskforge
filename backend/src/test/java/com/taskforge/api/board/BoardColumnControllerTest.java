@@ -198,6 +198,27 @@ class BoardColumnControllerTest {
 				.andExpect(jsonPath("$.message").value("Column not found"));
 	}
 
+	@Test
+	void rejectsDeletingColumnThatContainsTasks() throws Exception {
+		String boardLocation = createBoard("Column With Task Project " + UUID.randomUUID(), "Column With Task Board");
+		String boardId = idFromLocation(boardLocation);
+		String todoColumnId = JsonPath.read(getColumns(boardId), "$[0].id");
+
+		mockMvc.perform(post("/api/board-columns/{columnId}/tasks", todoColumnId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "title": "Blocking task"
+								}
+								"""))
+				.andExpect(status().isCreated());
+
+		mockMvc.perform(delete("/api/board-columns/{columnId}", todoColumnId))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.status").value(409))
+				.andExpect(jsonPath("$.message").value("Column contains tasks and cannot be deleted"));
+	}
+
 	private String createBoard(String projectName, String boardName) throws Exception {
 		String projectLocation = mockMvc.perform(post("/api/projects")
 						.contentType(MediaType.APPLICATION_JSON)

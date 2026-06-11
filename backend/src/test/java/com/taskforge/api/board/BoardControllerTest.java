@@ -118,6 +118,31 @@ class BoardControllerTest {
 				.andExpect(status().isNotFound());
 	}
 
+	@Test
+	void rejectsDeletingBoardThatContainsTasks() throws Exception {
+		String projectLocation = createProject("Board With Task Project " + UUID.randomUUID());
+		String boardLocation = createBoard(projectLocation, "Board With Task " + UUID.randomUUID());
+		String todoColumnId = com.jayway.jsonpath.JsonPath.read(mockMvc.perform(get(boardLocation))
+						.andExpect(status().isOk())
+						.andReturn()
+						.getResponse()
+						.getContentAsString(), "$.columns[0].id");
+
+		mockMvc.perform(post("/api/board-columns/{columnId}/tasks", todoColumnId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "title": "Blocking task"
+								}
+								"""))
+				.andExpect(status().isCreated());
+
+		mockMvc.perform(delete(boardLocation))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.status").value(409))
+				.andExpect(jsonPath("$.message").value("Board contains tasks and cannot be deleted"));
+	}
+
 	private String createProject(String projectName) throws Exception {
 		return mockMvc.perform(post("/api/projects")
 						.contentType(MediaType.APPLICATION_JSON)

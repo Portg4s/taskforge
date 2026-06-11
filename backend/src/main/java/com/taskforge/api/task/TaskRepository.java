@@ -12,4 +12,10 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
 	List<Task> findByBoardIdOrderByPositionAsc(UUID boardId);
 
 	List<Task> findByColumnIdOrderByPositionAsc(UUID columnId);
+
+	boolean existsByColumnId(UUID columnId);
+
+	boolean existsByBoardId(UUID boardId);
+
+	boolean existsByBoardProjectId(UUID projectId);
 }

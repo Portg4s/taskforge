@@ -2,6 +2,7 @@ package com.taskforge.api.project;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -106,5 +107,87 @@ class ProjectControllerTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.name").value("Updated name"))
 				.andExpect(jsonPath("$.description").value("Original description"));
+	}
+
+	@Test
+	void deletesEmptyProject() throws Exception {
+		String location = createProject("Empty Project " + UUID.randomUUID());
+
+		mockMvc.perform(delete(location))
+				.andExpect(status().isNoContent());
+
+		mockMvc.perform(get(location))
+				.andExpect(status().isNotFound());
+	}
+
+	@Test
+	void rejectsDeletingProjectThatContainsBoards() throws Exception {
+		String projectLocation = createProject("Project With Board " + UUID.randomUUID());
+		createBoard(projectLocation, "Blocking Board " + UUID.randomUUID());
+
+		mockMvc.perform(delete(projectLocation))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.status").value(409))
+				.andExpect(jsonPath("$.message").value("Project contains boards and cannot be deleted"));
+	}
+
+	@Test
+	void rejectsDeletingProjectThatContainsTasks() throws Exception {
+		String projectLocation = createProject("Project With Task " + UUID.randomUUID());
+		String boardLocation = createBoard(projectLocation, "Task Blocking Board " + UUID.randomUUID());
+		String todoColumnId = firstColumnId(boardLocation);
+		createTask(todoColumnId, "Blocking task");
+
+		mockMvc.perform(delete(projectLocation))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.status").value(409))
+				.andExpect(jsonPath("$.message").value("Project contains tasks and cannot be deleted"));
+	}
+
+	private String createProject(String projectName) throws Exception {
+		return mockMvc.perform(post("/api/projects")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "name": "%s"
+								}
+								""".formatted(projectName)))
+				.andExpect(status().isCreated())
+				.andReturn()
+				.getResponse()
+				.getHeader("Location");
+	}
+
+	private String createBoard(String projectLocation, String boardName) throws Exception {
+		return mockMvc.perform(post(projectLocation + "/boards")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "name": "%s"
+								}
+								""".formatted(boardName)))
+				.andExpect(status().isCreated())
+				.andReturn()
+				.getResponse()
+				.getHeader("Location");
+	}
+
+	private String firstColumnId(String boardLocation) throws Exception {
+		return com.jayway.jsonpath.JsonPath.read(mockMvc.perform(get(boardLocation))
+						.andExpect(status().isOk())
+						.andReturn()
+						.getResponse()
+						.getContentAsString(), "$.columns[0].id");
+	}
+
+	private void createTask(String columnId, String title) throws Exception {
+		mockMvc.perform(post("/api/board-columns/{columnId}/tasks", columnId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "title": "%s"
+								}
+								""".formatted(title)))
+				.andExpect(status().isCreated());
 	}
 }

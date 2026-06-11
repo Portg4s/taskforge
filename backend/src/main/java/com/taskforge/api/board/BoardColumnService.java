@@ -12,6 +12,7 @@ import com.taskforge.api.board.dto.BoardColumnResponse;
 import com.taskforge.api.board.dto.CreateBoardColumnRequest;
 import com.taskforge.api.board.dto.ReorderBoardColumnsRequest;
 import com.taskforge.api.board.dto.UpdateBoardColumnRequest;
+import com.taskforge.api.task.TaskRepository;
 import com.taskforge.api.user.User;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -23,14 +24,17 @@ public class BoardColumnService {
 
 	private final BoardRepository boardRepository;
 	private final BoardColumnRepository boardColumnRepository;
+	private final TaskRepository taskRepository;
 	private final DevUserProvider devUserProvider;
 
 	public BoardColumnService(
 			BoardRepository boardRepository,
 			BoardColumnRepository boardColumnRepository,
+			TaskRepository taskRepository,
 			DevUserProvider devUserProvider) {
 		this.boardRepository = boardRepository;
 		this.boardColumnRepository = boardColumnRepository;
+		this.taskRepository = taskRepository;
 		this.devUserProvider = devUserProvider;
 	}
 
@@ -100,7 +104,10 @@ public class BoardColumnService {
 		User currentUser = devUserProvider.getCurrentUser();
 		BoardColumn column = findOwnedColumn(columnId, currentUser);
 
-		// Later, when tasks are active, deletion must prevent or handle columns containing tasks.
+		if (taskRepository.existsByColumnId(column.getId())) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "Column contains tasks and cannot be deleted");
+		}
+
 		boardColumnRepository.delete(column);
 	}
 

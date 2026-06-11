@@ -10,6 +10,7 @@ import com.taskforge.api.board.dto.CreateBoardRequest;
 import com.taskforge.api.board.dto.UpdateBoardRequest;
 import com.taskforge.api.project.Project;
 import com.taskforge.api.project.ProjectRepository;
+import com.taskforge.api.task.TaskRepository;
 import com.taskforge.api.user.User;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -24,16 +25,19 @@ public class BoardService {
 	private final BoardRepository boardRepository;
 	private final BoardColumnRepository boardColumnRepository;
 	private final ProjectRepository projectRepository;
+	private final TaskRepository taskRepository;
 	private final DevUserProvider devUserProvider;
 
 	public BoardService(
 			BoardRepository boardRepository,
 			BoardColumnRepository boardColumnRepository,
 			ProjectRepository projectRepository,
+			TaskRepository taskRepository,
 			DevUserProvider devUserProvider) {
 		this.boardRepository = boardRepository;
 		this.boardColumnRepository = boardColumnRepository;
 		this.projectRepository = projectRepository;
+		this.taskRepository = taskRepository;
 		this.devUserProvider = devUserProvider;
 	}
 
@@ -87,6 +91,10 @@ public class BoardService {
 	public void deleteBoard(UUID boardId) {
 		User currentUser = devUserProvider.getCurrentUser();
 		Board board = findOwnedBoard(boardId, currentUser);
+
+		if (taskRepository.existsByBoardId(board.getId())) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "Board contains tasks and cannot be deleted");
+		}
 
 		boardColumnRepository.deleteByBoardId(board.getId());
 		boardRepository.delete(board);
