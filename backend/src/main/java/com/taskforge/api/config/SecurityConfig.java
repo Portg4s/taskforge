@@ -24,6 +24,8 @@ public class SecurityConfig {
 						.requestMatchers("/api/boards", "/api/boards/**").permitAll()
 						// Temporary until JWT authentication is implemented.
 						.requestMatchers("/api/board-columns", "/api/board-columns/**").permitAll()
+						// Temporary until JWT authentication is implemented.
+						.requestMatchers("/api/tasks", "/api/tasks/**").permitAll()
 						// Future API endpoints stay protected until real authentication is added.
 						.anyRequest().authenticated())
 				.httpBasic(Customizer.withDefaults())
