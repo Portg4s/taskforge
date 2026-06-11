@@ -7,8 +7,10 @@ import { finalize } from 'rxjs';
 import { BoardColumn } from './core/models/board-column.model';
 import { Board } from './core/models/board.model';
 import { Project } from './core/models/project.model';
+import { Task } from './core/models/task.model';
 import { BoardApiService } from './core/services/board-api.service';
 import { ProjectApiService } from './core/services/project-api.service';
+import { TaskApiService } from './core/services/task-api.service';
 
 @Component({
   selector: 'app-root',
@@ -19,6 +21,7 @@ import { ProjectApiService } from './core/services/project-api.service';
 export class App implements OnInit {
   private readonly projectApi = inject(ProjectApiService);
   private readonly boardApi = inject(BoardApiService);
+  private readonly taskApi = inject(TaskApiService);
 
   protected readonly projectName = new FormControl('', {
     nonNullable: true,
@@ -33,13 +36,20 @@ export class App implements OnInit {
   protected readonly projects = signal<Project[]>([]);
   protected readonly boards = signal<Board[]>([]);
   protected readonly columns = signal<BoardColumn[]>([]);
+  protected readonly tasks = signal<Task[]>([]);
+  protected readonly newTaskTitles = signal<Record<string, string>>({});
+  protected readonly taskMoveTargets = signal<Record<string, string>>({});
   protected readonly selectedProject = signal<Project | null>(null);
   protected readonly selectedBoard = signal<Board | null>(null);
   protected readonly loadingProjects = signal(false);
   protected readonly loadingBoards = signal(false);
   protected readonly loadingColumns = signal(false);
+  protected readonly loadingTasks = signal(false);
   protected readonly savingProject = signal(false);
   protected readonly savingBoard = signal(false);
+  protected readonly savingTaskColumnId = signal<string | null>(null);
+  protected readonly movingTaskId = signal<string | null>(null);
+  protected readonly deletingTaskId = signal<string | null>(null);
   protected readonly errorMessage = signal('');
 
   ngOnInit(): void {
@@ -98,6 +108,7 @@ export class App implements OnInit {
     this.selectedBoard.set(null);
     this.boards.set([]);
     this.columns.set([]);
+    this.tasks.set([]);
     this.boardName.reset('');
     this.loadBoards(project.id);
   }
@@ -135,7 +146,110 @@ export class App implements OnInit {
   protected selectBoard(board: Board): void {
     this.selectedBoard.set(board);
     this.columns.set([]);
+    this.tasks.set([]);
     this.loadColumns(board.id);
+    this.loadTasks(board.id);
+  }
+
+  protected tasksForColumn(columnId: string): Task[] {
+    return this.tasks()
+      .filter((task) => task.columnId === columnId)
+      .sort((first, second) => first.position - second.position);
+  }
+
+  protected updateNewTaskTitle(columnId: string, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.newTaskTitles.update((titles) => ({
+      ...titles,
+      [columnId]: input.value,
+    }));
+  }
+
+  protected createTask(columnId: string, input: HTMLInputElement): void {
+    const title = input.value.trim();
+    if (title.length === 0) {
+      return;
+    }
+
+    this.savingTaskColumnId.set(columnId);
+    this.errorMessage.set('');
+
+    this.taskApi
+      .createTask(columnId, { title })
+      .pipe(finalize(() => this.savingTaskColumnId.set(null)))
+      .subscribe({
+        next: (task) => {
+          this.tasks.update((tasks) => [...tasks, task]);
+          this.taskMoveTargets.update((targets) => ({
+            ...targets,
+            [task.id]: task.columnId,
+          }));
+          input.value = '';
+          this.newTaskTitles.update((titles) => ({
+            ...titles,
+            [columnId]: '',
+          }));
+        },
+        error: (error: unknown) => {
+          this.setError('Impossible de creer la tache.', error);
+        },
+      });
+  }
+
+  protected updateTaskMoveTarget(taskId: string, event: Event): void {
+    this.taskMoveTargets.update((targets) => ({
+      ...targets,
+      [taskId]: (event.target as HTMLSelectElement).value,
+    }));
+  }
+
+  protected moveTask(task: Task): void {
+    const targetColumnId = this.taskMoveTargets()[task.id] ?? task.columnId;
+    if (targetColumnId === task.columnId) {
+      return;
+    }
+
+    this.movingTaskId.set(task.id);
+    this.errorMessage.set('');
+
+    this.taskApi
+      .moveTask(task.id, { columnId: targetColumnId, position: this.tasksForColumn(targetColumnId).length })
+      .pipe(finalize(() => this.movingTaskId.set(null)))
+      .subscribe({
+        next: (movedTask) => {
+          this.tasks.update((tasks) => tasks.map((candidate) => (candidate.id === movedTask.id ? movedTask : candidate)));
+          this.taskMoveTargets.update((targets) => ({
+            ...targets,
+            [movedTask.id]: movedTask.columnId,
+          }));
+          this.reloadSelectedBoardTasks();
+        },
+        error: (error: unknown) => {
+          this.setError('Impossible de deplacer la tache.', error);
+        },
+      });
+  }
+
+  protected deleteTask(task: Task): void {
+    this.deletingTaskId.set(task.id);
+    this.errorMessage.set('');
+
+    this.taskApi
+      .deleteTask(task.id)
+      .pipe(finalize(() => this.deletingTaskId.set(null)))
+      .subscribe({
+        next: () => {
+          this.tasks.update((tasks) => tasks.filter((candidate) => candidate.id !== task.id));
+          this.taskMoveTargets.update((targets) => {
+            const nextTargets = { ...targets };
+            delete nextTargets[task.id];
+            return nextTargets;
+          });
+        },
+        error: (error: unknown) => {
+          this.setError('Impossible de supprimer la tache.', error);
+        },
+      });
   }
 
   private loadBoards(projectId: string): void {
@@ -170,6 +284,35 @@ export class App implements OnInit {
           this.setError('Impossible de charger les colonnes.', error);
         },
       });
+  }
+
+  private loadTasks(boardId: string): void {
+    this.loadingTasks.set(true);
+    this.errorMessage.set('');
+
+    this.taskApi
+      .listBoardTasks(boardId)
+      .pipe(finalize(() => this.loadingTasks.set(false)))
+      .subscribe({
+        next: (tasks) => {
+          this.tasks.set(tasks);
+          this.syncTaskMoveTargets(tasks);
+        },
+        error: (error: unknown) => {
+          this.setError('Impossible de charger les taches.', error);
+        },
+      });
+  }
+
+  private reloadSelectedBoardTasks(): void {
+    const board = this.selectedBoard();
+    if (board !== null) {
+      this.loadTasks(board.id);
+    }
+  }
+
+  private syncTaskMoveTargets(tasks: Task[]): void {
+    this.taskMoveTargets.set(Object.fromEntries(tasks.map((task) => [task.id, task.columnId])));
   }
 
   private setError(fallback: string, error: unknown): void {

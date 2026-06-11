@@ -111,6 +111,10 @@
       @if (selectedBoard(); as board) {
         <p class="context-label">{{ board.name }}</p>
 
+        @if (loadingTasks()) {
+          <p class="empty-state">Chargement des taches...</p>
+        }
+
         @if (!loadingColumns() && columns().length === 0) {
           <p class="empty-state">Aucune colonne sur ce board.</p>
         }
@@ -118,8 +122,78 @@
         <div class="column-list">
           @for (column of columns(); track column.id) {
             <div class="column-item">
-              <span class="position">{{ column.position + 1 }}</span>
-              <strong>{{ column.name }}</strong>
+              <div class="column-title">
+                <span class="position">{{ column.position + 1 }}</span>
+                <strong>{{ column.name }}</strong>
+              </div>
+
+              <form class="task-form" (submit)="createTask(column.id, taskTitleInput); $event.preventDefault()">
+                <input
+                  #taskTitleInput
+                  type="text"
+                  [value]="newTaskTitles()[column.id] ?? ''"
+                  (input)="updateNewTaskTitle(column.id, $event)"
+                  placeholder="Nouvelle tache"
+                >
+                <button type="submit" [disabled]="savingTaskColumnId() === column.id">
+                  {{ savingTaskColumnId() === column.id ? 'Ajout...' : 'Ajouter' }}
+                </button>
+              </form>
+
+              @if (!loadingTasks() && tasksForColumn(column.id).length === 0) {
+                <p class="empty-state compact">Aucune tache.</p>
+              }
+
+              <div class="task-list">
+                @for (task of tasksForColumn(column.id); track task.id) {
+                  <article class="task-card">
+                    <div class="task-header">
+                      <strong>{{ task.title }}</strong>
+                      <span class="priority">{{ task.priority }}</span>
+                    </div>
+
+                    @if (task.description) {
+                      <p>{{ task.description }}</p>
+                    }
+
+                    @if (task.dueDate) {
+                      <p class="task-meta">Echeance: {{ task.dueDate }}</p>
+                    }
+
+                    <div class="task-actions">
+                      <select
+                        [value]="taskMoveTargets()[task.id] ?? task.columnId"
+                        (change)="updateTaskMoveTarget(task.id, $event)"
+                      >
+                        @for (targetColumn of columns(); track targetColumn.id) {
+                          <option
+                            [value]="targetColumn.id"
+                            [selected]="(taskMoveTargets()[task.id] ?? task.columnId) === targetColumn.id"
+                          >
+                            {{ targetColumn.name }}
+                          </option>
+                        }
+                      </select>
+                      <button
+                        type="button"
+                        class="secondary-button"
+                        (click)="moveTask(task)"
+                        [disabled]="movingTaskId() === task.id || (taskMoveTargets()[task.id] ?? task.columnId) === task.columnId"
+                      >
+                        {{ movingTaskId() === task.id ? 'Deplacement...' : 'Deplacer' }}
+                      </button>
+                      <button
+                        type="button"
+                        class="danger-button"
+                        (click)="deleteTask(task)"
+                        [disabled]="deletingTaskId() === task.id"
+                      >
+                        {{ deletingTaskId() === task.id ? 'Suppression...' : 'Supprimer' }}
+                      </button>
+                    </div>
+                  </article>
+                }
+              </div>
             </div>
           }
         </div>
