@@ -1,9 +1,131 @@
 <main class="app-shell">
-  <section class="intro">
-    <p class="eyebrow">TaskForge</p>
-    <h1>Gestion collaborative de projets</h1>
-    <p class="lead">Base Angular prête pour construire progressivement l'application.</p>
-  </section>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">TaskForge</p>
+      <h1>Projets et boards</h1>
+    </div>
+    <button type="button" class="secondary-button" (click)="loadProjects()" [disabled]="loadingProjects">
+      Rafraîchir
+    </button>
+  </header>
 
-  <router-outlet />
+  @if (errorMessage) {
+    <p class="error-message">{{ errorMessage }}</p>
+  }
+
+  <section class="workspace">
+    <article class="panel">
+      <div class="panel-heading">
+        <h2>Projets</h2>
+        @if (loadingProjects) {
+          <span>Chargement...</span>
+        }
+      </div>
+
+      <form class="stacked-form" (ngSubmit)="createProject()">
+        <label for="project-name">Nom du projet</label>
+        <input id="project-name" type="text" [formControl]="projectName" placeholder="Ex: Refonte produit">
+
+        <label for="project-description">Description</label>
+        <textarea
+          id="project-description"
+          [formControl]="projectDescription"
+          rows="3"
+          placeholder="Optionnel"
+        ></textarea>
+
+        <button type="submit" [disabled]="savingProject">
+          {{ savingProject ? 'Création...' : 'Créer le projet' }}
+        </button>
+      </form>
+
+      @if (!loadingProjects && projects.length === 0) {
+        <p class="empty-state">Aucun projet pour l'instant.</p>
+      }
+
+      <div class="item-list">
+        @for (project of projects; track project.id) {
+          <button
+            type="button"
+            class="list-item"
+            [class.selected]="selectedProject?.id === project.id"
+            (click)="selectProject(project)"
+          >
+            <strong>{{ project.name }}</strong>
+            @if (project.description) {
+              <span>{{ project.description }}</span>
+            }
+          </button>
+        }
+      </div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-heading">
+        <h2>Boards</h2>
+        @if (loadingBoards) {
+          <span>Chargement...</span>
+        }
+      </div>
+
+      @if (selectedProject) {
+        <p class="context-label">{{ selectedProject.name }}</p>
+
+        <form class="inline-form" (ngSubmit)="createBoard()">
+          <input type="text" [formControl]="boardName" placeholder="Nouveau board">
+          <button type="submit" [disabled]="savingBoard">
+            {{ savingBoard ? 'Création...' : 'Créer' }}
+          </button>
+        </form>
+
+        @if (!loadingBoards && boards.length === 0) {
+          <p class="empty-state">Aucun board dans ce projet.</p>
+        }
+
+        <div class="item-list">
+          @for (board of boards; track board.id) {
+            <button
+              type="button"
+              class="list-item"
+              [class.selected]="selectedBoard?.id === board.id"
+              (click)="selectBoard(board)"
+            >
+              <strong>{{ board.name }}</strong>
+              <span>{{ board.columns.length }} colonnes</span>
+            </button>
+          }
+        </div>
+      } @else {
+        <p class="empty-state">Sélectionne un projet pour afficher ses boards.</p>
+      }
+    </article>
+
+    <article class="panel">
+      <div class="panel-heading">
+        <h2>Colonnes</h2>
+        @if (loadingColumns) {
+          <span>Chargement...</span>
+        }
+      </div>
+
+      @if (selectedBoard) {
+        <p class="context-label">{{ selectedBoard.name }}</p>
+
+        @if (!loadingColumns && columns.length === 0) {
+          <p class="empty-state">Aucune colonne sur ce board.</p>
+        }
+
+        <div class="column-list">
+          @for (column of columns; track column.id) {
+            <div class="column-item">
+              <span class="position">{{ column.position + 1 }}</span>
+              <strong>{{ column.name }}</strong>
+            </div>
+          }
+        </div>
+      } @else {
+        <p class="empty-state">Sélectionne un board pour afficher ses colonnes.</p>
+      }
+    </article>
+  </section>
 </main>
