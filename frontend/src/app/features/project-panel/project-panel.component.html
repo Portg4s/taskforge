@@ -1,0 +1,45 @@
+<article class="panel">
+  <div class="panel-heading">
+    <h2>Projets</h2>
+    @if (loading) {
+      <span>Chargement...</span>
+    }
+  </div>
+
+  <form class="stacked-form" (submit)="submitProject(); $event.preventDefault()">
+    <label for="project-name">Nom du projet</label>
+    <input id="project-name" type="text" [formControl]="projectName" placeholder="Ex: Refonte produit">
+
+    <label for="project-description">Description</label>
+    <textarea
+      id="project-description"
+      [formControl]="projectDescription"
+      rows="3"
+      placeholder="Optionnel"
+    ></textarea>
+
+    <button type="submit" [disabled]="saving">
+      {{ saving ? 'Creation...' : 'Creer le projet' }}
+    </button>
+  </form>
+
+  @if (!loading && projects.length === 0) {
+    <p class="empty-state">Aucun projet pour l'instant.</p>
+  }
+
+  <div class="item-list">
+    @for (project of projects; track project.id) {
+      <button
+        type="button"
+        class="list-item"
+        [class.selected]="selectedProject?.id === project.id"
+        (click)="projectSelect.emit(project)"
+      >
+        <strong>{{ project.name }}</strong>
+        @if (project.description) {
+          <span>{{ project.description }}</span>
+        }
+      </button>
+    }
+  </div>
+</article>

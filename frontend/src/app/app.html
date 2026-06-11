@@ -14,192 +14,38 @@
   }
 
   <section class="workspace">
-    <article class="panel">
-      <div class="panel-heading">
-        <h2>Projets</h2>
-        @if (loadingProjects()) {
-          <span>Chargement...</span>
-        }
-      </div>
+    <app-project-panel
+      [projects]="projects()"
+      [selectedProject]="selectedProject()"
+      [loading]="loadingProjects()"
+      [saving]="savingProject()"
+      (refresh)="loadProjects()"
+      (projectCreate)="createProject($event)"
+      (projectSelect)="selectProject($event)"
+    />
 
-      <form class="stacked-form" (submit)="createProject(); $event.preventDefault()">
-        <label for="project-name">Nom du projet</label>
-        <input id="project-name" type="text" [formControl]="projectName" placeholder="Ex: Refonte produit">
+    <app-board-panel
+      [selectedProject]="selectedProject()"
+      [boards]="boards()"
+      [selectedBoard]="selectedBoard()"
+      [loading]="loadingBoards()"
+      [saving]="savingBoard()"
+      (boardCreate)="createBoard($event)"
+      (boardSelect)="selectBoard($event)"
+    />
 
-        <label for="project-description">Description</label>
-        <textarea
-          id="project-description"
-          [formControl]="projectDescription"
-          rows="3"
-          placeholder="Optionnel"
-        ></textarea>
-
-        <button type="submit" [disabled]="savingProject()">
-          {{ savingProject() ? 'Creation...' : 'Creer le projet' }}
-        </button>
-      </form>
-
-      @if (!loadingProjects() && projects().length === 0) {
-        <p class="empty-state">Aucun projet pour l'instant.</p>
-      }
-
-      <div class="item-list">
-        @for (project of projects(); track project.id) {
-          <button
-            type="button"
-            class="list-item"
-            [class.selected]="selectedProject()?.id === project.id"
-            (click)="selectProject(project)"
-          >
-            <strong>{{ project.name }}</strong>
-            @if (project.description) {
-              <span>{{ project.description }}</span>
-            }
-          </button>
-        }
-      </div>
-    </article>
-
-    <article class="panel">
-      <div class="panel-heading">
-        <h2>Boards</h2>
-        @if (loadingBoards()) {
-          <span>Chargement...</span>
-        }
-      </div>
-
-      @if (selectedProject(); as project) {
-        <p class="context-label">{{ project.name }}</p>
-
-        <form class="inline-form" (submit)="createBoard(); $event.preventDefault()">
-          <input id="board-name" type="text" [formControl]="boardName" placeholder="Nouveau board">
-          <button type="submit" [disabled]="savingBoard()">
-            {{ savingBoard() ? 'Creation...' : 'Creer' }}
-          </button>
-        </form>
-
-        @if (!loadingBoards() && boards().length === 0) {
-          <p class="empty-state">Aucun board dans ce projet.</p>
-        }
-
-        <div class="item-list">
-          @for (board of boards(); track board.id) {
-            <button
-              type="button"
-              class="list-item"
-              [class.selected]="selectedBoard()?.id === board.id"
-              (click)="selectBoard(board)"
-            >
-              <strong>{{ board.name }}</strong>
-              <span>{{ board.columns.length }} colonnes</span>
-            </button>
-          }
-        </div>
-      } @else {
-        <p class="empty-state">Selectionne un projet pour afficher ses boards.</p>
-      }
-    </article>
-
-    <article class="panel">
-      <div class="panel-heading">
-        <h2>Colonnes</h2>
-        @if (loadingColumns()) {
-          <span>Chargement...</span>
-        }
-      </div>
-
-      @if (selectedBoard(); as board) {
-        <p class="context-label">{{ board.name }}</p>
-
-        @if (loadingTasks()) {
-          <p class="empty-state">Chargement des taches...</p>
-        }
-
-        @if (!loadingColumns() && columns().length === 0) {
-          <p class="empty-state">Aucune colonne sur ce board.</p>
-        }
-
-        <div class="column-list">
-          @for (column of columns(); track column.id) {
-            <div class="column-item">
-              <div class="column-title">
-                <span class="position">{{ column.position + 1 }}</span>
-                <strong>{{ column.name }}</strong>
-              </div>
-
-              <form class="task-form" (submit)="createTask(column.id, taskTitleInput); $event.preventDefault()">
-                <input
-                  #taskTitleInput
-                  type="text"
-                  [value]="newTaskTitles()[column.id] ?? ''"
-                  (input)="updateNewTaskTitle(column.id, $event)"
-                  placeholder="Nouvelle tache"
-                >
-                <button type="submit" [disabled]="savingTaskColumnId() === column.id">
-                  {{ savingTaskColumnId() === column.id ? 'Ajout...' : 'Ajouter' }}
-                </button>
-              </form>
-
-              @if (!loadingTasks() && tasksForColumn(column.id).length === 0) {
-                <p class="empty-state compact">Aucune tache.</p>
-              }
-
-              <div class="task-list">
-                @for (task of tasksForColumn(column.id); track task.id) {
-                  <article class="task-card">
-                    <div class="task-header">
-                      <strong>{{ task.title }}</strong>
-                      <span class="priority">{{ task.priority }}</span>
-                    </div>
-
-                    @if (task.description) {
-                      <p>{{ task.description }}</p>
-                    }
-
-                    @if (task.dueDate) {
-                      <p class="task-meta">Echeance: {{ task.dueDate }}</p>
-                    }
-
-                    <div class="task-actions">
-                      <select
-                        [value]="taskMoveTargets()[task.id] ?? task.columnId"
-                        (change)="updateTaskMoveTarget(task.id, $event)"
-                      >
-                        @for (targetColumn of columns(); track targetColumn.id) {
-                          <option
-                            [value]="targetColumn.id"
-                            [selected]="(taskMoveTargets()[task.id] ?? task.columnId) === targetColumn.id"
-                          >
-                            {{ targetColumn.name }}
-                          </option>
-                        }
-                      </select>
-                      <button
-                        type="button"
-                        class="secondary-button"
-                        (click)="moveTask(task)"
-                        [disabled]="movingTaskId() === task.id || (taskMoveTargets()[task.id] ?? task.columnId) === task.columnId"
-                      >
-                        {{ movingTaskId() === task.id ? 'Deplacement...' : 'Deplacer' }}
-                      </button>
-                      <button
-                        type="button"
-                        class="danger-button"
-                        (click)="deleteTask(task)"
-                        [disabled]="deletingTaskId() === task.id"
-                      >
-                        {{ deletingTaskId() === task.id ? 'Suppression...' : 'Supprimer' }}
-                      </button>
-                    </div>
-                  </article>
-                }
-              </div>
-            </div>
-          }
-        </div>
-      } @else {
-        <p class="empty-state">Selectionne un board pour afficher ses colonnes.</p>
-      }
-    </article>
+    <app-board-columns
+      [selectedBoard]="selectedBoard()"
+      [columns]="columns()"
+      [tasks]="tasks()"
+      [loadingColumns]="loadingColumns()"
+      [loadingTasks]="loadingTasks()"
+      [savingTaskColumnId]="savingTaskColumnId()"
+      [movingTaskId]="movingTaskId()"
+      [deletingTaskId]="deletingTaskId()"
+      (taskCreate)="createTask($event)"
+      (taskMove)="moveTask($event)"
+      (taskDelete)="deleteTask($event)"
+    />
   </section>
 </main>

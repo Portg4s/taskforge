@@ -296,6 +296,18 @@ describe('App', () => {
 
     expect(compiled.textContent).toContain('Nouvelle tache');
     expect(taskInput!.value).toBe('');
+
+    const existingTaskCard = Array.from(compiled.querySelectorAll<HTMLElement>('.task-card'))
+      .find((card) => card.textContent?.includes('Task existante'));
+    expect(existingTaskCard).toBeTruthy();
+    existingTaskCard!.querySelector<HTMLButtonElement>('.danger-button')!.click();
+
+    const deleteRequest = httpTesting.expectOne('/api/tasks/task-1');
+    expect(deleteRequest.request.method).toBe('DELETE');
+    deleteRequest.flush(null);
+    fixture.detectChanges();
+
+    expect(compiled.textContent).not.toContain('Task existante');
   });
 
   it('should sync the move select with the task current column after moving', () => {

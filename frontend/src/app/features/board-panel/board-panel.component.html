@@ -1,0 +1,39 @@
+<article class="panel">
+  <div class="panel-heading">
+    <h2>Boards</h2>
+    @if (loading) {
+      <span>Chargement...</span>
+    }
+  </div>
+
+  @if (selectedProject) {
+    <p class="context-label">{{ selectedProject.name }}</p>
+
+    <form class="inline-form" (submit)="submitBoard(); $event.preventDefault()">
+      <input id="board-name" type="text" [formControl]="boardName" placeholder="Nouveau board">
+      <button type="submit" [disabled]="saving">
+        {{ saving ? 'Creation...' : 'Creer' }}
+      </button>
+    </form>
+
+    @if (!loading && boards.length === 0) {
+      <p class="empty-state">Aucun board dans ce projet.</p>
+    }
+
+    <div class="item-list">
+      @for (board of boards; track board.id) {
+        <button
+          type="button"
+          class="list-item"
+          [class.selected]="selectedBoard?.id === board.id"
+          (click)="boardSelect.emit(board)"
+        >
+          <strong>{{ board.name }}</strong>
+          <span>{{ board.columns.length }} colonnes</span>
+        </button>
+      }
+    </div>
+  } @else {
+    <p class="empty-state">Selectionne un projet pour afficher ses boards.</p>
+  }
+</article>

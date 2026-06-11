@@ -1,0 +1,65 @@
+<article class="panel">
+  <div class="panel-heading">
+    <h2>Colonnes</h2>
+    @if (loadingColumns) {
+      <span>Chargement...</span>
+    }
+  </div>
+
+  @if (selectedBoard) {
+    <p class="context-label">{{ selectedBoard.name }}</p>
+
+    @if (loadingTasks) {
+      <p class="empty-state">Chargement des taches...</p>
+    }
+
+    @if (!loadingColumns && columns.length === 0) {
+      <p class="empty-state">Aucune colonne sur ce board.</p>
+    }
+
+    <div class="column-list">
+      @for (column of columns; track column.id) {
+        <div class="column-item">
+          <div class="column-title">
+            <span class="position">{{ column.position + 1 }}</span>
+            <strong>{{ column.name }}</strong>
+          </div>
+
+          <form class="task-form" (submit)="submitTask(column.id, taskTitleInput); $event.preventDefault()">
+            <input
+              #taskTitleInput
+              type="text"
+              [value]="newTaskTitles[column.id] ?? ''"
+              (input)="updateNewTaskTitle(column.id, $event)"
+              placeholder="Nouvelle tache"
+            >
+            <button type="submit" [disabled]="savingTaskColumnId === column.id">
+              {{ savingTaskColumnId === column.id ? 'Ajout...' : 'Ajouter' }}
+            </button>
+          </form>
+
+          @if (!loadingTasks && tasksForColumn(column.id).length === 0) {
+            <p class="empty-state compact">Aucune tache.</p>
+          }
+
+          <div class="task-list">
+            @for (task of tasksForColumn(column.id); track task.id) {
+              <app-task-card
+                [task]="task"
+                [columns]="columns"
+                [targetColumnId]="taskMoveTargets[task.id] ?? task.columnId"
+                [moving]="movingTaskId === task.id"
+                [deleting]="deletingTaskId === task.id"
+                (targetColumnChange)="setTaskMoveTarget(task.id, $event)"
+                (taskMove)="emitMove($event)"
+                (taskDelete)="taskDelete.emit($event)"
+              />
+            }
+          </div>
+        </div>
+      }
+    </div>
+  } @else {
+    <p class="empty-state">Selectionne un board pour afficher ses colonnes.</p>
+  }
+</article>
