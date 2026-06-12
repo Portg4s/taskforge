@@ -1,43 +1,108 @@
 <article class="task-card">
-  <div class="task-header">
-    <strong>{{ task.title }}</strong>
-    <span class="priority">{{ task.priority }}</span>
-  </div>
+  @if (editing) {
+    <form class="task-edit-form" (submit)="submitEdit(); $event.preventDefault()">
+      <label>
+        Titre
+        <input
+          type="text"
+          [value]="editTitle"
+          (input)="updateTitle($event)"
+          [disabled]="updating"
+          required
+        >
+      </label>
 
-  @if (task.description) {
-    <p>{{ task.description }}</p>
+      <label>
+        Description
+        <textarea
+          rows="3"
+          [value]="editDescription"
+          (input)="updateDescription($event)"
+          [disabled]="updating"
+        ></textarea>
+      </label>
+
+      <label>
+        Priorite
+        <select
+          [value]="editPriority"
+          (change)="updatePriority($event)"
+          [disabled]="updating"
+        >
+          @for (priority of priorities; track priority) {
+            <option [value]="priority" [selected]="editPriority === priority">{{ priority }}</option>
+          }
+        </select>
+      </label>
+
+      <label>
+        Echeance
+        <input
+          type="date"
+          [value]="editDueDate"
+          (input)="updateDueDate($event)"
+          [disabled]="updating"
+        >
+      </label>
+
+      <div class="task-actions">
+        <button type="submit" [disabled]="updating">
+          {{ updating ? 'Enregistrement...' : 'Enregistrer' }}
+        </button>
+        <button type="button" class="secondary-button" (click)="cancelEditing()" [disabled]="updating">
+          Annuler
+        </button>
+      </div>
+    </form>
+  } @else {
+    <div class="task-header">
+      <strong>{{ task.title }}</strong>
+      <span class="priority">{{ task.priority }}</span>
+    </div>
+
+    @if (task.description) {
+      <p>{{ task.description }}</p>
+    }
+
+    @if (task.dueDate) {
+      <p class="task-meta">Echeance: {{ task.dueDate }}</p>
+    }
+
+    <div class="task-actions">
+      <select
+        [value]="targetColumnId"
+        (change)="targetColumnChange.emit($any($event.target).value)"
+      >
+        @for (column of columns; track column.id) {
+          <option [value]="column.id" [selected]="targetColumnId === column.id">
+            {{ column.name }}
+          </option>
+        }
+      </select>
+      <button
+        type="button"
+        class="secondary-button"
+        (click)="startEditing()"
+        [disabled]="updating"
+      >
+        Modifier
+      </button>
+      <button
+        type="button"
+        class="secondary-button"
+        (click)="taskMove.emit(task)"
+        [disabled]="moving || updating || targetColumnId === task.columnId"
+      >
+        {{ moving ? 'Deplacement...' : 'Deplacer' }}
+      </button>
+      <button
+        type="button"
+        class="danger-button"
+        (click)="taskDelete.emit(task)"
+        [disabled]="deleting || updating"
+      >
+        {{ deleting ? 'Suppression...' : 'Supprimer' }}
+      </button>
+    </div>
   }
-
-  @if (task.dueDate) {
-    <p class="task-meta">Echeance: {{ task.dueDate }}</p>
-  }
-
-  <div class="task-actions">
-    <select
-      [value]="targetColumnId"
-      (change)="targetColumnChange.emit($any($event.target).value)"
-    >
-      @for (column of columns; track column.id) {
-        <option [value]="column.id" [selected]="targetColumnId === column.id">
-          {{ column.name }}
-        </option>
-      }
-    </select>
-    <button
-      type="button"
-      class="secondary-button"
-      (click)="taskMove.emit(task)"
-      [disabled]="moving || targetColumnId === task.columnId"
-    >
-      {{ moving ? 'Deplacement...' : 'Deplacer' }}
-    </button>
-    <button
-      type="button"
-      class="danger-button"
-      (click)="taskDelete.emit(task)"
-      [disabled]="deleting"
-    >
-      {{ deleting ? 'Suppression...' : 'Supprimer' }}
-    </button>
-  </div>
 </article>

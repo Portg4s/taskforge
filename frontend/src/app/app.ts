@@ -13,6 +13,7 @@ import { TaskApiService } from './core/services/task-api.service';
 import { BoardColumnsComponent, CreateTaskEvent, MoveTaskEvent } from './features/board-columns/board-columns.component';
 import { BoardPanelComponent } from './features/board-panel/board-panel.component';
 import { ProjectPanelComponent } from './features/project-panel/project-panel.component';
+import { UpdateTaskEvent } from './features/task-card/task-card.component';
 
 interface SelectProjectOptions {
   restoreStoredBoard?: boolean;
@@ -45,6 +46,7 @@ export class App implements OnInit {
   protected readonly savingProject = signal(false);
   protected readonly savingBoard = signal(false);
   protected readonly savingTaskColumnId = signal<string | null>(null);
+  protected readonly updatingTaskId = signal<string | null>(null);
   protected readonly movingTaskId = signal<string | null>(null);
   protected readonly deletingTaskId = signal<string | null>(null);
   protected readonly errorMessage = signal('');
@@ -172,6 +174,24 @@ export class App implements OnInit {
         },
         error: (error: unknown) => {
           this.setError('Impossible de deplacer la tache.', error);
+        },
+      });
+  }
+
+  protected updateTask(event: UpdateTaskEvent): void {
+    const { task, title, description, priority, dueDate } = event;
+    this.updatingTaskId.set(task.id);
+    this.errorMessage.set('');
+
+    this.taskApi
+      .updateTask(task.id, { title, description, priority, dueDate })
+      .pipe(finalize(() => this.updatingTaskId.set(null)))
+      .subscribe({
+        next: (updatedTask) => {
+          this.tasks.update((tasks) => tasks.map((candidate) => (candidate.id === updatedTask.id ? updatedTask : candidate)));
+        },
+        error: (error: unknown) => {
+          this.setError('Impossible de modifier la tache.', error);
         },
       });
   }

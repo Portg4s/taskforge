@@ -4,7 +4,7 @@ import { Component, EventEmitter, Input, OnChanges, Output } from '@angular/core
 import { BoardColumn } from '../../core/models/board-column.model';
 import { Board } from '../../core/models/board.model';
 import { Task } from '../../core/models/task.model';
-import { TaskCardComponent } from '../task-card/task-card.component';
+import { TaskCardComponent, UpdateTaskEvent } from '../task-card/task-card.component';
 
 export interface CreateTaskEvent {
   columnId: string;
@@ -30,10 +30,12 @@ export class BoardColumnsComponent implements OnChanges {
   @Input() savingTaskColumnId: string | null = null;
   @Input() movingTaskId: string | null = null;
   @Input() deletingTaskId: string | null = null;
+  @Input() updatingTaskId: string | null = null;
 
   @Output() taskCreate = new EventEmitter<CreateTaskEvent>();
   @Output() taskMove = new EventEmitter<MoveTaskEvent>();
   @Output() taskDelete = new EventEmitter<Task>();
+  @Output() taskUpdate = new EventEmitter<UpdateTaskEvent>();
 
   protected newTaskTitles: Record<string, string> = {};
   protected taskMoveTargets: Record<string, string> = {};

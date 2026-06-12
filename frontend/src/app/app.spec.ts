@@ -38,6 +38,22 @@ function buildColumn(id = 'column-1', name = 'Todo') {
   };
 }
 
+function buildTask(id = 'task-1', title = 'Task existante') {
+  return {
+    id,
+    title,
+    description: 'Avec description',
+    priority: 'HIGH' as const,
+    dueDate: '2026-12-24',
+    position: 0,
+    boardId: 'board-1',
+    columnId: 'column-1',
+    assigneeId: null,
+    createdAt: '2026-06-11T09:30:00Z',
+    updatedAt: '2026-06-11T09:30:00Z',
+  };
+}
+
 describe('App', () => {
   let httpTesting: HttpTestingController;
 
@@ -59,6 +75,31 @@ describe('App', () => {
     httpTesting.verify();
     localStorage.clear();
   });
+
+  function openBoardWithTask(task = buildTask()) {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    httpTesting.expectOne('/api/projects').flush([buildProject()]);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    Array.from(compiled.querySelectorAll<HTMLButtonElement>('.list-item'))
+      .find((button) => button.textContent?.includes('Projet Alpha'))!
+      .click();
+
+    httpTesting.expectOne('/api/projects/project-1/boards').flush([buildBoard()]);
+    fixture.detectChanges();
+
+    Array.from(compiled.querySelectorAll<HTMLButtonElement>('.list-item'))
+      .find((button) => button.textContent?.includes('Board Produit'))!
+      .click();
+
+    httpTesting.expectOne('/api/boards/board-1/columns').flush([buildColumn()]);
+    httpTesting.expectOne('/api/boards/board-1/tasks').flush([task]);
+    fixture.detectChanges();
+
+    return { fixture, compiled };
+  }
 
   it('should create the app', () => {
     const fixture = TestBed.createComponent(App);
@@ -435,6 +476,122 @@ describe('App', () => {
     expect(compiled.textContent).not.toContain('Task existante');
   });
 
+  it('should switch a task to edit mode when clicking Modifier', () => {
+    const { fixture, compiled } = openBoardWithTask();
+
+    const taskCard = compiled.querySelector<HTMLElement>('.task-card');
+    expect(taskCard).toBeTruthy();
+
+    Array.from(taskCard!.querySelectorAll<HTMLButtonElement>('button'))
+      .find((button) => button.textContent?.includes('Modifier'))!
+      .click();
+    fixture.detectChanges();
+
+    expect(taskCard!.querySelector('.task-edit-form')).toBeTruthy();
+    expect(taskCard!.textContent).toContain('Enregistrer');
+    expect(taskCard!.textContent).toContain('Annuler');
+    expect(taskCard!.querySelector<HTMLInputElement>('input[type="text"]')!.value).toBe('Task existante');
+    expect(taskCard!.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('Avec description');
+    expect(taskCard!.querySelector<HTMLSelectElement>('.task-edit-form select')!.value).toBe('HIGH');
+    expect(taskCard!.querySelector<HTMLInputElement>('input[type="date"]')!.value).toBe('2026-12-24');
+  });
+
+  it('should cancel task editing without sending a PATCH request', () => {
+    const { fixture, compiled } = openBoardWithTask();
+    const taskCard = compiled.querySelector<HTMLElement>('.task-card')!;
+
+    Array.from(taskCard.querySelectorAll<HTMLButtonElement>('button'))
+      .find((button) => button.textContent?.includes('Modifier'))!
+      .click();
+    fixture.detectChanges();
+
+    const titleInput = taskCard.querySelector<HTMLInputElement>('input[type="text"]')!;
+    titleInput.value = 'Titre ignore';
+    titleInput.dispatchEvent(new Event('input'));
+
+    Array.from(taskCard.querySelectorAll<HTMLButtonElement>('button'))
+      .find((button) => button.textContent?.includes('Annuler'))!
+      .click();
+    fixture.detectChanges();
+
+    httpTesting.expectNone('/api/tasks/task-1');
+    expect(taskCard.querySelector('.task-edit-form')).toBeNull();
+    expect(taskCard.textContent).toContain('Task existante');
+    expect(taskCard.textContent).not.toContain('Titre ignore');
+  });
+
+  it('should update a task and display the backend response', () => {
+    const { fixture, compiled } = openBoardWithTask();
+    const taskCard = compiled.querySelector<HTMLElement>('.task-card')!;
+
+    Array.from(taskCard.querySelectorAll<HTMLButtonElement>('button'))
+      .find((button) => button.textContent?.includes('Modifier'))!
+      .click();
+    fixture.detectChanges();
+
+    const titleInput = taskCard.querySelector<HTMLInputElement>('input[type="text"]')!;
+    const descriptionInput = taskCard.querySelector<HTMLTextAreaElement>('textarea')!;
+    const prioritySelect = taskCard.querySelector<HTMLSelectElement>('.task-edit-form select')!;
+    const dueDateInput = taskCard.querySelector<HTMLInputElement>('input[type="date"]')!;
+
+    titleInput.value = 'Task modifiee';
+    titleInput.dispatchEvent(new Event('input'));
+    descriptionInput.value = 'Description modifiee';
+    descriptionInput.dispatchEvent(new Event('input'));
+    prioritySelect.value = 'LOW';
+    prioritySelect.dispatchEvent(new Event('change'));
+    dueDateInput.value = '2027-01-15';
+    dueDateInput.dispatchEvent(new Event('input'));
+
+    taskCard.querySelector<HTMLButtonElement>('.task-edit-form button[type="submit"]')!.click();
+    fixture.detectChanges();
+
+    const patchRequest = httpTesting.expectOne('/api/tasks/task-1');
+    expect(patchRequest.request.method).toBe('PATCH');
+    expect(patchRequest.request.body).toEqual({
+      title: 'Task modifiee',
+      description: 'Description modifiee',
+      priority: 'LOW',
+      dueDate: '2027-01-15',
+    });
+    expect(taskCard.textContent).toContain('Enregistrement...');
+
+    patchRequest.flush({
+      ...buildTask(),
+      title: 'Task modifiee',
+      description: 'Description modifiee',
+      priority: 'LOW',
+      dueDate: '2027-01-15',
+      updatedAt: '2026-06-11T09:45:00Z',
+    });
+    fixture.detectChanges();
+
+    expect(taskCard.querySelector('.task-edit-form')).toBeNull();
+    expect(taskCard.textContent).toContain('Task modifiee');
+    expect(taskCard.textContent).toContain('Description modifiee');
+    expect(taskCard.textContent).toContain('LOW');
+    expect(taskCard.textContent).toContain('2027-01-15');
+  });
+
+  it('should keep editing and avoid PATCH when the task title is empty', () => {
+    const { fixture, compiled } = openBoardWithTask();
+    const taskCard = compiled.querySelector<HTMLElement>('.task-card')!;
+
+    Array.from(taskCard.querySelectorAll<HTMLButtonElement>('button'))
+      .find((button) => button.textContent?.includes('Modifier'))!
+      .click();
+    fixture.detectChanges();
+
+    const titleInput = taskCard.querySelector<HTMLInputElement>('input[type="text"]')!;
+    titleInput.value = '   ';
+    titleInput.dispatchEvent(new Event('input'));
+    taskCard.querySelector<HTMLButtonElement>('.task-edit-form button[type="submit"]')!.click();
+    fixture.detectChanges();
+
+    httpTesting.expectNone('/api/tasks/task-1');
+    expect(taskCard.querySelector('.task-edit-form')).toBeTruthy();
+  });
+
   it('should sync the move select with the task current column after moving', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
@@ -533,7 +690,9 @@ describe('App', () => {
     select!.value = 'in-progress';
     select!.dispatchEvent(new Event('change'));
     fixture.detectChanges();
-    compiled.querySelector<HTMLButtonElement>('.task-actions .secondary-button')!.click();
+    Array.from(compiled.querySelectorAll<HTMLButtonElement>('.task-actions .secondary-button'))
+      .find((button) => button.textContent?.includes('Deplacer'))!
+      .click();
 
     const moveRequest = httpTesting.expectOne('/api/tasks/task-1/move');
     expect(moveRequest.request.method).toBe('PATCH');

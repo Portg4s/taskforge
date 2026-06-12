@@ -50,9 +50,11 @@
                 [targetColumnId]="taskMoveTargets[task.id] ?? task.columnId"
                 [moving]="movingTaskId === task.id"
                 [deleting]="deletingTaskId === task.id"
+                [updating]="updatingTaskId === task.id"
                 (targetColumnChange)="setTaskMoveTarget(task.id, $event)"
                 (taskMove)="emitMove($event)"
                 (taskDelete)="taskDelete.emit($event)"
+                (taskUpdate)="taskUpdate.emit($event)"
               />
             }
           </div>

@@ -41,9 +41,11 @@
       [loadingColumns]="loadingColumns()"
       [loadingTasks]="loadingTasks()"
       [savingTaskColumnId]="savingTaskColumnId()"
+      [updatingTaskId]="updatingTaskId()"
       [movingTaskId]="movingTaskId()"
       [deletingTaskId]="deletingTaskId()"
       (taskCreate)="createTask($event)"
+      (taskUpdate)="updateTask($event)"
       (taskMove)="moveTask($event)"
       (taskDelete)="deleteTask($event)"
     />

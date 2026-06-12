@@ -87,7 +87,8 @@ label {
 }
 
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   box-sizing: border-box;
   border: 1px solid #c8d1dc;
@@ -237,6 +238,16 @@ button:disabled {
   margin-bottom: 0;
   color: #445065;
   line-height: 1.45;
+}
+
+.task-edit-form {
+  display: grid;
+  gap: 10px;
+}
+
+.task-edit-form label {
+  display: grid;
+  gap: 6px;
 }
 
 .priority {
