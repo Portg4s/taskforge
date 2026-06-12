@@ -3,7 +3,7 @@ package com.taskforge.api.project;
 import java.util.List;
 import java.util.UUID;
 
-import com.taskforge.api.auth.DevUserProvider;
+import com.taskforge.api.auth.CurrentUserProvider;
 import com.taskforge.api.board.BoardRepository;
 import com.taskforge.api.project.dto.CreateProjectRequest;
 import com.taskforge.api.project.dto.ProjectResponse;
@@ -21,22 +21,22 @@ public class ProjectService {
 	private final ProjectRepository projectRepository;
 	private final BoardRepository boardRepository;
 	private final TaskRepository taskRepository;
-	private final DevUserProvider devUserProvider;
+	private final CurrentUserProvider currentUserProvider;
 
 	public ProjectService(
 			ProjectRepository projectRepository,
 			BoardRepository boardRepository,
 			TaskRepository taskRepository,
-			DevUserProvider devUserProvider) {
+			CurrentUserProvider currentUserProvider) {
 		this.projectRepository = projectRepository;
 		this.boardRepository = boardRepository;
 		this.taskRepository = taskRepository;
-		this.devUserProvider = devUserProvider;
+		this.currentUserProvider = currentUserProvider;
 	}
 
 	@Transactional
 	public List<ProjectResponse> listProjects() {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 
 		return projectRepository.findByOwnerId(currentUser.getId()).stream()
 				.map(this::toResponse)
@@ -45,7 +45,7 @@ public class ProjectService {
 
 	@Transactional
 	public ProjectResponse createProject(CreateProjectRequest request) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 		Project project = new Project(request.name(), request.description(), currentUser);
 
 		return toResponse(projectRepository.save(project));
@@ -53,14 +53,14 @@ public class ProjectService {
 
 	@Transactional
 	public ProjectResponse getProject(UUID id) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 
 		return toResponse(findOwnedProject(id, currentUser));
 	}
 
 	@Transactional
 	public ProjectResponse updateProject(UUID id, UpdateProjectRequest request) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 		Project project = findOwnedProject(id, currentUser);
 
 		if (request.name() != null) {
@@ -80,7 +80,7 @@ public class ProjectService {
 
 	@Transactional
 	public void deleteProject(UUID id) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 		Project project = findOwnedProject(id, currentUser);
 
 		if (taskRepository.existsByBoardProjectId(project.getId())) {

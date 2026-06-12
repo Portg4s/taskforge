@@ -7,7 +7,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import com.taskforge.api.auth.DevUserProvider;
+import com.taskforge.api.auth.CurrentUserProvider;
 import com.taskforge.api.board.dto.BoardColumnResponse;
 import com.taskforge.api.board.dto.CreateBoardColumnRequest;
 import com.taskforge.api.board.dto.ReorderBoardColumnsRequest;
@@ -25,22 +25,22 @@ public class BoardColumnService {
 	private final BoardRepository boardRepository;
 	private final BoardColumnRepository boardColumnRepository;
 	private final TaskRepository taskRepository;
-	private final DevUserProvider devUserProvider;
+	private final CurrentUserProvider currentUserProvider;
 
 	public BoardColumnService(
 			BoardRepository boardRepository,
 			BoardColumnRepository boardColumnRepository,
 			TaskRepository taskRepository,
-			DevUserProvider devUserProvider) {
+			CurrentUserProvider currentUserProvider) {
 		this.boardRepository = boardRepository;
 		this.boardColumnRepository = boardColumnRepository;
 		this.taskRepository = taskRepository;
-		this.devUserProvider = devUserProvider;
+		this.currentUserProvider = currentUserProvider;
 	}
 
 	@Transactional
 	public List<BoardColumnResponse> listColumns(UUID boardId) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 		Board board = findOwnedBoard(boardId, currentUser);
 
 		return findColumns(board).stream()
@@ -50,7 +50,7 @@ public class BoardColumnService {
 
 	@Transactional
 	public BoardColumnResponse createColumn(UUID boardId, CreateBoardColumnRequest request) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 		Board board = findOwnedBoard(boardId, currentUser);
 		int nextPosition = findColumns(board).stream()
 				.mapToInt(BoardColumn::getPosition)
@@ -63,7 +63,7 @@ public class BoardColumnService {
 
 	@Transactional
 	public BoardColumnResponse updateColumn(UUID columnId, UpdateBoardColumnRequest request) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 		BoardColumn column = findOwnedColumn(columnId, currentUser);
 
 		if (request.name() != null) {
@@ -79,7 +79,7 @@ public class BoardColumnService {
 
 	@Transactional
 	public List<BoardColumnResponse> reorderColumns(UUID boardId, ReorderBoardColumnsRequest request) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 		Board board = findOwnedBoard(boardId, currentUser);
 		List<BoardColumn> columns = findColumns(board);
 		List<UUID> requestedIds = request.columnIds();
@@ -101,7 +101,7 @@ public class BoardColumnService {
 
 	@Transactional
 	public void deleteColumn(UUID columnId) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 		BoardColumn column = findOwnedColumn(columnId, currentUser);
 
 		if (taskRepository.existsByColumnId(column.getId())) {

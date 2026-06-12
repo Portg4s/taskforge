@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import com.taskforge.api.auth.DevUserProvider;
+import com.taskforge.api.auth.CurrentUserProvider;
 import com.taskforge.api.board.Board;
 import com.taskforge.api.board.BoardColumn;
 import com.taskforge.api.board.BoardColumnRepository;
@@ -25,22 +25,22 @@ public class TaskService {
 	private final TaskRepository taskRepository;
 	private final BoardRepository boardRepository;
 	private final BoardColumnRepository boardColumnRepository;
-	private final DevUserProvider devUserProvider;
+	private final CurrentUserProvider currentUserProvider;
 
 	public TaskService(
 			TaskRepository taskRepository,
 			BoardRepository boardRepository,
 			BoardColumnRepository boardColumnRepository,
-			DevUserProvider devUserProvider) {
+			CurrentUserProvider currentUserProvider) {
 		this.taskRepository = taskRepository;
 		this.boardRepository = boardRepository;
 		this.boardColumnRepository = boardColumnRepository;
-		this.devUserProvider = devUserProvider;
+		this.currentUserProvider = currentUserProvider;
 	}
 
 	@Transactional
 	public List<TaskResponse> listBoardTasks(UUID boardId) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 		Board board = findOwnedBoard(boardId, currentUser);
 
 		return taskRepository.findByBoardIdOrderByPositionAsc(board.getId()).stream()
@@ -50,7 +50,7 @@ public class TaskService {
 
 	@Transactional
 	public List<TaskResponse> listColumnTasks(UUID columnId) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 		BoardColumn column = findOwnedColumn(columnId, currentUser);
 
 		return findColumnTasks(column).stream()
@@ -60,7 +60,7 @@ public class TaskService {
 
 	@Transactional
 	public TaskResponse createTask(UUID columnId, CreateTaskRequest request) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 		BoardColumn column = findOwnedColumn(columnId, currentUser);
 		int nextPosition = findColumnTasks(column).stream()
 				.mapToInt(Task::getPosition)
@@ -82,14 +82,14 @@ public class TaskService {
 
 	@Transactional
 	public TaskResponse getTask(UUID taskId) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 
 		return toResponse(findOwnedTask(taskId, currentUser));
 	}
 
 	@Transactional
 	public TaskResponse updateTask(UUID taskId, UpdateTaskRequest request) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 		Task task = findOwnedTask(taskId, currentUser);
 
 		if (request.title() != null) {
@@ -114,7 +114,7 @@ public class TaskService {
 
 	@Transactional
 	public TaskResponse moveTask(UUID taskId, MoveTaskRequest request) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 		Task task = findOwnedTask(taskId, currentUser);
 		BoardColumn targetColumn = findOwnedColumn(request.columnId(), currentUser);
 
@@ -134,7 +134,7 @@ public class TaskService {
 
 	@Transactional
 	public void deleteTask(UUID taskId) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 		Task task = findOwnedTask(taskId, currentUser);
 		BoardColumn column = task.getColumn();
 

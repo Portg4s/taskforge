@@ -12,11 +12,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.UUID;
 
+import com.taskforge.api.TestAuth;
+import com.taskforge.api.auth.JwtService;
+import com.taskforge.api.user.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,11 +32,23 @@ class ProjectControllerTest {
 	@Autowired
 	private MockMvc mockMvc;
 
+	@Autowired
+	private UserRepository userRepository;
+
+	@Autowired
+	private PasswordEncoder passwordEncoder;
+
+	@Autowired
+	private JwtService jwtService;
+
+	private String authorization;
+
 	@Test
 	void createsListsAndGetsProjectForDevUser() throws Exception {
 		String projectName = "Learning Backend " + UUID.randomUUID();
 
 		String location = mockMvc.perform(post("/api/projects")
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -50,11 +66,13 @@ class ProjectControllerTest {
 				.getResponse()
 				.getHeader("Location");
 
-		mockMvc.perform(get("/api/projects"))
+		mockMvc.perform(get("/api/projects")
+						.header("Authorization", authorization()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$[?(@.name == '%s')]".formatted(projectName), hasSize(1)));
 
-		mockMvc.perform(get(location))
+		mockMvc.perform(get(location)
+						.header("Authorization", authorization()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.name").value(projectName));
 	}
@@ -62,6 +80,7 @@ class ProjectControllerTest {
 	@Test
 	void rejectsBlankProjectName() throws Exception {
 		mockMvc.perform(post("/api/projects")
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -75,7 +94,8 @@ class ProjectControllerTest {
 
 	@Test
 	void returnsNotFoundForUnknownProject() throws Exception {
-		mockMvc.perform(get("/api/projects/{id}", UUID.randomUUID()))
+		mockMvc.perform(get("/api/projects/{id}", UUID.randomUUID())
+						.header("Authorization", authorization()))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.status").value(404))
 				.andExpect(jsonPath("$.message").value("Project not found"));
@@ -86,6 +106,7 @@ class ProjectControllerTest {
 		String originalName = "Original name " + UUID.randomUUID();
 
 		String location = mockMvc.perform(post("/api/projects")
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -98,6 +119,7 @@ class ProjectControllerTest {
 				.getHeader("Location");
 
 		mockMvc.perform(patch(location)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -113,10 +135,12 @@ class ProjectControllerTest {
 	void deletesEmptyProject() throws Exception {
 		String location = createProject("Empty Project " + UUID.randomUUID());
 
-		mockMvc.perform(delete(location))
+		mockMvc.perform(delete(location)
+						.header("Authorization", authorization()))
 				.andExpect(status().isNoContent());
 
-		mockMvc.perform(get(location))
+		mockMvc.perform(get(location)
+						.header("Authorization", authorization()))
 				.andExpect(status().isNotFound());
 	}
 
@@ -125,7 +149,8 @@ class ProjectControllerTest {
 		String projectLocation = createProject("Project With Board " + UUID.randomUUID());
 		createBoard(projectLocation, "Blocking Board " + UUID.randomUUID());
 
-		mockMvc.perform(delete(projectLocation))
+		mockMvc.perform(delete(projectLocation)
+						.header("Authorization", authorization()))
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.status").value(409))
 				.andExpect(jsonPath("$.message").value("Project contains boards and cannot be deleted"));
@@ -138,7 +163,8 @@ class ProjectControllerTest {
 		String todoColumnId = firstColumnId(boardLocation);
 		createTask(todoColumnId, "Blocking task");
 
-		mockMvc.perform(delete(projectLocation))
+		mockMvc.perform(delete(projectLocation)
+						.header("Authorization", authorization()))
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.status").value(409))
 				.andExpect(jsonPath("$.message").value("Project contains tasks and cannot be deleted"));
@@ -146,6 +172,7 @@ class ProjectControllerTest {
 
 	private String createProject(String projectName) throws Exception {
 		return mockMvc.perform(post("/api/projects")
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -160,6 +187,7 @@ class ProjectControllerTest {
 
 	private String createBoard(String projectLocation, String boardName) throws Exception {
 		return mockMvc.perform(post(projectLocation + "/boards")
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -173,7 +201,8 @@ class ProjectControllerTest {
 	}
 
 	private String firstColumnId(String boardLocation) throws Exception {
-		return com.jayway.jsonpath.JsonPath.read(mockMvc.perform(get(boardLocation))
+		return com.jayway.jsonpath.JsonPath.read(mockMvc.perform(get(boardLocation)
+						.header("Authorization", authorization()))
 						.andExpect(status().isOk())
 						.andReturn()
 						.getResponse()
@@ -182,6 +211,7 @@ class ProjectControllerTest {
 
 	private void createTask(String columnId, String title) throws Exception {
 		mockMvc.perform(post("/api/board-columns/{columnId}/tasks", columnId)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -189,5 +219,13 @@ class ProjectControllerTest {
 								}
 								""".formatted(title)))
 				.andExpect(status().isCreated());
+	}
+
+	private String authorization() {
+		if (authorization == null) {
+			authorization = TestAuth.bearerToken(userRepository, passwordEncoder, jwtService);
+		}
+
+		return authorization;
 	}
 }

@@ -14,11 +14,15 @@ import java.util.List;
 import java.util.UUID;
 
 import com.jayway.jsonpath.JsonPath;
+import com.taskforge.api.TestAuth;
+import com.taskforge.api.auth.JwtService;
+import com.taskforge.api.user.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,12 +34,24 @@ class BoardColumnControllerTest {
 	@Autowired
 	private MockMvc mockMvc;
 
+	@Autowired
+	private UserRepository userRepository;
+
+	@Autowired
+	private PasswordEncoder passwordEncoder;
+
+	@Autowired
+	private JwtService jwtService;
+
+	private String authorization;
+
 	@Test
 	void listsCreatesUpdatesReordersAndDeletesColumns() throws Exception {
 		String boardLocation = createBoard("Column API Project " + UUID.randomUUID(), "Column Board " + UUID.randomUUID());
 		String boardId = idFromLocation(boardLocation);
 
-		String columnsResponse = mockMvc.perform(get("/api/boards/{boardId}/columns", boardId))
+		String columnsResponse = mockMvc.perform(get("/api/boards/{boardId}/columns", boardId)
+						.header("Authorization", authorization()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$", hasSize(3)))
 				.andExpect(jsonPath("$[0].name").value("Todo"))
@@ -53,6 +69,7 @@ class BoardColumnControllerTest {
 		String doneId = JsonPath.read(columnsResponse, "$[2].id");
 
 		String reviewId = mockMvc.perform(post("/api/boards/{boardId}/columns", boardId)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -70,6 +87,7 @@ class BoardColumnControllerTest {
 				.substring("/api/board-columns/".length());
 
 		mockMvc.perform(patch("/api/board-columns/{columnId}", reviewId)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -80,6 +98,7 @@ class BoardColumnControllerTest {
 				.andExpect(jsonPath("$.name").value("QA Review"));
 
 		mockMvc.perform(patch("/api/boards/{boardId}/columns/reorder", boardId)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -102,14 +121,17 @@ class BoardColumnControllerTest {
 				.andExpect(jsonPath("$[3].id").value(inProgressId))
 				.andExpect(jsonPath("$[3].position").value(3));
 
-		mockMvc.perform(delete("/api/board-columns/{columnId}", reviewId))
+		mockMvc.perform(delete("/api/board-columns/{columnId}", reviewId)
+						.header("Authorization", authorization()))
 				.andExpect(status().isNoContent());
 
-		mockMvc.perform(get("/api/boards/{boardId}/columns", boardId))
+		mockMvc.perform(get("/api/boards/{boardId}/columns", boardId)
+						.header("Authorization", authorization()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$", hasSize(3)));
 
 		mockMvc.perform(post("/api/boards/{boardId}/columns", boardId)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -126,6 +148,7 @@ class BoardColumnControllerTest {
 		String boardId = idFromLocation(boardLocation);
 
 		mockMvc.perform(post("/api/boards/{boardId}/columns", boardId)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -150,24 +173,28 @@ class BoardColumnControllerTest {
 		String otherColumnId = JsonPath.read(getColumns(otherBoardId), "$[0].id");
 
 		mockMvc.perform(patch("/api/boards/{boardId}/columns/reorder", boardId)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(reorderBody(List.of(todoId, todoId, doneId))))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.message").value("Column order must not contain duplicates"));
 
 		mockMvc.perform(patch("/api/boards/{boardId}/columns/reorder", boardId)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(reorderBody(List.of(todoId, inProgressId))))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.message").value("Column order must include every board column exactly once"));
 
 		mockMvc.perform(patch("/api/boards/{boardId}/columns/reorder", boardId)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(reorderBody(List.of(todoId, inProgressId, otherColumnId))))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.message").value("Column order must include only columns from this board"));
 
 		mockMvc.perform(patch("/api/boards/{boardId}/columns/reorder", boardId)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(reorderBody(List.of(todoId, inProgressId, UUID.randomUUID().toString()))))
 				.andExpect(status().isBadRequest())
@@ -176,12 +203,14 @@ class BoardColumnControllerTest {
 
 	@Test
 	void returnsNotFoundForUnknownBoardAndColumn() throws Exception {
-		mockMvc.perform(get("/api/boards/{boardId}/columns", UUID.randomUUID()))
+		mockMvc.perform(get("/api/boards/{boardId}/columns", UUID.randomUUID())
+						.header("Authorization", authorization()))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.status").value(404))
 				.andExpect(jsonPath("$.message").value("Board not found"));
 
 		mockMvc.perform(patch("/api/board-columns/{columnId}", UUID.randomUUID())
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -192,7 +221,8 @@ class BoardColumnControllerTest {
 				.andExpect(jsonPath("$.status").value(404))
 				.andExpect(jsonPath("$.message").value("Column not found"));
 
-		mockMvc.perform(delete("/api/board-columns/{columnId}", UUID.randomUUID()))
+		mockMvc.perform(delete("/api/board-columns/{columnId}", UUID.randomUUID())
+						.header("Authorization", authorization()))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.status").value(404))
 				.andExpect(jsonPath("$.message").value("Column not found"));
@@ -205,6 +235,7 @@ class BoardColumnControllerTest {
 		String todoColumnId = JsonPath.read(getColumns(boardId), "$[0].id");
 
 		mockMvc.perform(post("/api/board-columns/{columnId}/tasks", todoColumnId)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -213,7 +244,8 @@ class BoardColumnControllerTest {
 								"""))
 				.andExpect(status().isCreated());
 
-		mockMvc.perform(delete("/api/board-columns/{columnId}", todoColumnId))
+		mockMvc.perform(delete("/api/board-columns/{columnId}", todoColumnId)
+						.header("Authorization", authorization()))
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.status").value(409))
 				.andExpect(jsonPath("$.message").value("Column contains tasks and cannot be deleted"));
@@ -221,6 +253,7 @@ class BoardColumnControllerTest {
 
 	private String createBoard(String projectName, String boardName) throws Exception {
 		String projectLocation = mockMvc.perform(post("/api/projects")
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -233,6 +266,7 @@ class BoardColumnControllerTest {
 				.getHeader("Location");
 
 		return mockMvc.perform(post(projectLocation + "/boards")
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -246,7 +280,8 @@ class BoardColumnControllerTest {
 	}
 
 	private String getColumns(String boardId) throws Exception {
-		return mockMvc.perform(get("/api/boards/{boardId}/columns", boardId))
+		return mockMvc.perform(get("/api/boards/{boardId}/columns", boardId)
+						.header("Authorization", authorization()))
 				.andExpect(status().isOk())
 				.andReturn()
 				.getResponse()
@@ -265,5 +300,13 @@ class BoardColumnControllerTest {
 				  ]
 				}
 				""".formatted(String.join("\",\n    \"", columnIds));
+	}
+
+	private String authorization() {
+		if (authorization == null) {
+			authorization = TestAuth.bearerToken(userRepository, passwordEncoder, jwtService);
+		}
+
+		return authorization;
 	}
 }

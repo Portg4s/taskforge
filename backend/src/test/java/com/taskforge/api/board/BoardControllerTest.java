@@ -12,11 +12,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.UUID;
 
+import com.taskforge.api.TestAuth;
+import com.taskforge.api.auth.JwtService;
+import com.taskforge.api.user.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,12 +32,24 @@ class BoardControllerTest {
 	@Autowired
 	private MockMvc mockMvc;
 
+	@Autowired
+	private UserRepository userRepository;
+
+	@Autowired
+	private PasswordEncoder passwordEncoder;
+
+	@Autowired
+	private JwtService jwtService;
+
+	private String authorization;
+
 	@Test
 	void createsListsAndGetsBoardWithDefaultColumns() throws Exception {
 		String projectLocation = createProject("Board API Project " + UUID.randomUUID());
 		String boardName = "Product Board " + UUID.randomUUID();
 
 		String boardLocation = mockMvc.perform(post(projectLocation + "/boards")
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -56,11 +72,13 @@ class BoardControllerTest {
 				.getResponse()
 				.getHeader("Location");
 
-		mockMvc.perform(get(projectLocation + "/boards"))
+		mockMvc.perform(get(projectLocation + "/boards")
+						.header("Authorization", authorization()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$[?(@.name == '%s')]".formatted(boardName), hasSize(1)));
 
-		mockMvc.perform(get(boardLocation))
+		mockMvc.perform(get(boardLocation)
+						.header("Authorization", authorization()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.name").value(boardName))
 				.andExpect(jsonPath("$.columns", hasSize(3)));
@@ -71,6 +89,7 @@ class BoardControllerTest {
 		String projectLocation = createProject("Invalid Board Project " + UUID.randomUUID());
 
 		mockMvc.perform(post(projectLocation + "/boards")
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -84,12 +103,14 @@ class BoardControllerTest {
 
 	@Test
 	void returnsNotFoundForUnknownProjectAndBoard() throws Exception {
-		mockMvc.perform(get("/api/projects/{projectId}/boards", UUID.randomUUID()))
+		mockMvc.perform(get("/api/projects/{projectId}/boards", UUID.randomUUID())
+						.header("Authorization", authorization()))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.status").value(404))
 				.andExpect(jsonPath("$.message").value("Project not found"));
 
-		mockMvc.perform(get("/api/boards/{boardId}", UUID.randomUUID()))
+		mockMvc.perform(get("/api/boards/{boardId}", UUID.randomUUID())
+						.header("Authorization", authorization()))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.status").value(404))
 				.andExpect(jsonPath("$.message").value("Board not found"));
@@ -101,6 +122,7 @@ class BoardControllerTest {
 		String boardLocation = createBoard(projectLocation, "Original Board " + UUID.randomUUID());
 
 		mockMvc.perform(patch(boardLocation)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -111,10 +133,12 @@ class BoardControllerTest {
 				.andExpect(jsonPath("$.name").value("Updated Board"))
 				.andExpect(jsonPath("$.columns", hasSize(3)));
 
-		mockMvc.perform(delete(boardLocation))
+		mockMvc.perform(delete(boardLocation)
+						.header("Authorization", authorization()))
 				.andExpect(status().isNoContent());
 
-		mockMvc.perform(get(boardLocation))
+		mockMvc.perform(get(boardLocation)
+						.header("Authorization", authorization()))
 				.andExpect(status().isNotFound());
 	}
 
@@ -122,13 +146,15 @@ class BoardControllerTest {
 	void rejectsDeletingBoardThatContainsTasks() throws Exception {
 		String projectLocation = createProject("Board With Task Project " + UUID.randomUUID());
 		String boardLocation = createBoard(projectLocation, "Board With Task " + UUID.randomUUID());
-		String todoColumnId = com.jayway.jsonpath.JsonPath.read(mockMvc.perform(get(boardLocation))
+		String todoColumnId = com.jayway.jsonpath.JsonPath.read(mockMvc.perform(get(boardLocation)
+						.header("Authorization", authorization()))
 						.andExpect(status().isOk())
 						.andReturn()
 						.getResponse()
 						.getContentAsString(), "$.columns[0].id");
 
 		mockMvc.perform(post("/api/board-columns/{columnId}/tasks", todoColumnId)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -137,7 +163,8 @@ class BoardControllerTest {
 								"""))
 				.andExpect(status().isCreated());
 
-		mockMvc.perform(delete(boardLocation))
+		mockMvc.perform(delete(boardLocation)
+						.header("Authorization", authorization()))
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.status").value(409))
 				.andExpect(jsonPath("$.message").value("Board contains tasks and cannot be deleted"));
@@ -145,6 +172,7 @@ class BoardControllerTest {
 
 	private String createProject(String projectName) throws Exception {
 		return mockMvc.perform(post("/api/projects")
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -159,6 +187,7 @@ class BoardControllerTest {
 
 	private String createBoard(String projectLocation, String boardName) throws Exception {
 		return mockMvc.perform(post(projectLocation + "/boards")
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -169,5 +198,13 @@ class BoardControllerTest {
 				.andReturn()
 				.getResponse()
 				.getHeader("Location");
+	}
+
+	private String authorization() {
+		if (authorization == null) {
+			authorization = TestAuth.bearerToken(userRepository, passwordEncoder, jwtService);
+		}
+
+		return authorization;
 	}
 }

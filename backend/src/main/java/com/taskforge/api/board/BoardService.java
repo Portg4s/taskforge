@@ -3,7 +3,7 @@ package com.taskforge.api.board;
 import java.util.List;
 import java.util.UUID;
 
-import com.taskforge.api.auth.DevUserProvider;
+import com.taskforge.api.auth.CurrentUserProvider;
 import com.taskforge.api.board.dto.BoardColumnResponse;
 import com.taskforge.api.board.dto.BoardResponse;
 import com.taskforge.api.board.dto.CreateBoardRequest;
@@ -26,24 +26,24 @@ public class BoardService {
 	private final BoardColumnRepository boardColumnRepository;
 	private final ProjectRepository projectRepository;
 	private final TaskRepository taskRepository;
-	private final DevUserProvider devUserProvider;
+	private final CurrentUserProvider currentUserProvider;
 
 	public BoardService(
 			BoardRepository boardRepository,
 			BoardColumnRepository boardColumnRepository,
 			ProjectRepository projectRepository,
 			TaskRepository taskRepository,
-			DevUserProvider devUserProvider) {
+			CurrentUserProvider currentUserProvider) {
 		this.boardRepository = boardRepository;
 		this.boardColumnRepository = boardColumnRepository;
 		this.projectRepository = projectRepository;
 		this.taskRepository = taskRepository;
-		this.devUserProvider = devUserProvider;
+		this.currentUserProvider = currentUserProvider;
 	}
 
 	@Transactional
 	public List<BoardResponse> listBoards(UUID projectId) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 		Project project = findOwnedProject(projectId, currentUser);
 
 		return boardRepository.findByProjectId(project.getId()).stream()
@@ -53,7 +53,7 @@ public class BoardService {
 
 	@Transactional
 	public BoardResponse createBoard(UUID projectId, CreateBoardRequest request) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 		Project project = findOwnedProject(projectId, currentUser);
 		Board board = boardRepository.save(new Board(request.name(), project));
 
@@ -66,14 +66,14 @@ public class BoardService {
 
 	@Transactional
 	public BoardResponse getBoard(UUID boardId) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 
 		return toResponse(findOwnedBoard(boardId, currentUser));
 	}
 
 	@Transactional
 	public BoardResponse updateBoard(UUID boardId, UpdateBoardRequest request) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 		Board board = findOwnedBoard(boardId, currentUser);
 
 		if (request.name() != null) {
@@ -89,7 +89,7 @@ public class BoardService {
 
 	@Transactional
 	public void deleteBoard(UUID boardId) {
-		User currentUser = devUserProvider.getCurrentUser();
+		User currentUser = currentUserProvider.getCurrentUser();
 		Board board = findOwnedBoard(boardId, currentUser);
 
 		if (taskRepository.existsByBoardId(board.getId())) {

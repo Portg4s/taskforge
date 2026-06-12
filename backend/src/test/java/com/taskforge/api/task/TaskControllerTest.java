@@ -13,11 +13,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.UUID;
 
 import com.jayway.jsonpath.JsonPath;
+import com.taskforge.api.TestAuth;
+import com.taskforge.api.auth.JwtService;
+import com.taskforge.api.user.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +32,17 @@ class TaskControllerTest {
 
 	@Autowired
 	private MockMvc mockMvc;
+
+	@Autowired
+	private UserRepository userRepository;
+
+	@Autowired
+	private PasswordEncoder passwordEncoder;
+
+	@Autowired
+	private JwtService jwtService;
+
+	private String authorization;
 
 	@Test
 	void createsListsGetsUpdatesMovesAndDeletesTasks() throws Exception {
@@ -53,7 +68,8 @@ class TaskControllerTest {
 				.getHeader("Location")
 				.substring("/api/tasks/".length());
 
-		mockMvc.perform(get("/api/board-columns/{columnId}/tasks", todoId))
+		mockMvc.perform(get("/api/board-columns/{columnId}/tasks", todoId)
+						.header("Authorization", authorization()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$", hasSize(2)))
 				.andExpect(jsonPath("$[0].id").value(firstTaskId))
@@ -61,11 +77,13 @@ class TaskControllerTest {
 				.andExpect(jsonPath("$[1].id").value(secondTaskId))
 				.andExpect(jsonPath("$[1].position").value(1));
 
-		mockMvc.perform(get("/api/boards/{boardId}/tasks", boardId))
+		mockMvc.perform(get("/api/boards/{boardId}/tasks", boardId)
+						.header("Authorization", authorization()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$", hasSize(2)));
 
-		mockMvc.perform(get("/api/tasks/{taskId}", firstTaskId))
+		mockMvc.perform(get("/api/tasks/{taskId}", firstTaskId)
+						.header("Authorization", authorization()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.id").value(firstTaskId))
 				.andExpect(jsonPath("$.title").value("Write task API"))
@@ -73,6 +91,7 @@ class TaskControllerTest {
 				.andExpect(jsonPath("$.columnId").value(todoId));
 
 		mockMvc.perform(patch("/api/tasks/{taskId}", firstTaskId)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -89,6 +108,7 @@ class TaskControllerTest {
 				.andExpect(jsonPath("$.dueDate").value("2026-12-24"));
 
 		mockMvc.perform(patch("/api/tasks/{taskId}/move", secondTaskId)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -100,13 +120,15 @@ class TaskControllerTest {
 				.andExpect(jsonPath("$.columnId").value(inProgressId))
 				.andExpect(jsonPath("$.position").value(0));
 
-		mockMvc.perform(get("/api/board-columns/{columnId}/tasks", todoId))
+		mockMvc.perform(get("/api/board-columns/{columnId}/tasks", todoId)
+						.header("Authorization", authorization()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$", hasSize(1)))
 				.andExpect(jsonPath("$[0].id").value(firstTaskId))
 				.andExpect(jsonPath("$[0].position").value(0));
 
 		mockMvc.perform(patch("/api/tasks/{taskId}/move", firstTaskId)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -118,7 +140,8 @@ class TaskControllerTest {
 				.andExpect(jsonPath("$.columnId").value(inProgressId))
 				.andExpect(jsonPath("$.position").value(0));
 
-		mockMvc.perform(get("/api/board-columns/{columnId}/tasks", inProgressId))
+		mockMvc.perform(get("/api/board-columns/{columnId}/tasks", inProgressId)
+						.header("Authorization", authorization()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$", hasSize(2)))
 				.andExpect(jsonPath("$[0].id").value(firstTaskId))
@@ -126,10 +149,12 @@ class TaskControllerTest {
 				.andExpect(jsonPath("$[1].id").value(secondTaskId))
 				.andExpect(jsonPath("$[1].position").value(1));
 
-		mockMvc.perform(delete("/api/tasks/{taskId}", firstTaskId))
+		mockMvc.perform(delete("/api/tasks/{taskId}", firstTaskId)
+						.header("Authorization", authorization()))
 				.andExpect(status().isNoContent());
 
-		mockMvc.perform(get("/api/board-columns/{columnId}/tasks", inProgressId))
+		mockMvc.perform(get("/api/board-columns/{columnId}/tasks", inProgressId)
+						.header("Authorization", authorization()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$", hasSize(1)))
 				.andExpect(jsonPath("$[0].id").value(secondTaskId))
@@ -142,6 +167,7 @@ class TaskControllerTest {
 		String todoId = JsonPath.read(getColumns(idFromLocation(boardLocation)), "$[0].id");
 
 		mockMvc.perform(post("/api/board-columns/{columnId}/tasks", todoId)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -155,17 +181,20 @@ class TaskControllerTest {
 
 	@Test
 	void returnsNotFoundForUnknownBoardColumnAndTask() throws Exception {
-		mockMvc.perform(get("/api/boards/{boardId}/tasks", UUID.randomUUID()))
+		mockMvc.perform(get("/api/boards/{boardId}/tasks", UUID.randomUUID())
+						.header("Authorization", authorization()))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.status").value(404))
 				.andExpect(jsonPath("$.message").value("Board not found"));
 
-		mockMvc.perform(get("/api/board-columns/{columnId}/tasks", UUID.randomUUID()))
+		mockMvc.perform(get("/api/board-columns/{columnId}/tasks", UUID.randomUUID())
+						.header("Authorization", authorization()))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.status").value(404))
 				.andExpect(jsonPath("$.message").value("Column not found"));
 
-		mockMvc.perform(get("/api/tasks/{taskId}", UUID.randomUUID()))
+		mockMvc.perform(get("/api/tasks/{taskId}", UUID.randomUUID())
+						.header("Authorization", authorization()))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.status").value(404))
 				.andExpect(jsonPath("$.message").value("Task not found"));
@@ -186,6 +215,7 @@ class TaskControllerTest {
 		String otherColumnId = JsonPath.read(getColumns(idFromLocation(otherBoardLocation)), "$[0].id");
 
 		mockMvc.perform(patch("/api/tasks/{taskId}/move", taskId)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -208,6 +238,7 @@ class TaskControllerTest {
 				""".formatted(priority);
 
 		return mockMvc.perform(post("/api/board-columns/{columnId}/tasks", columnId)
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -222,6 +253,7 @@ class TaskControllerTest {
 
 	private String createBoard(String projectName, String boardName) throws Exception {
 		String projectLocation = mockMvc.perform(post("/api/projects")
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -234,6 +266,7 @@ class TaskControllerTest {
 				.getHeader("Location");
 
 		return mockMvc.perform(post(projectLocation + "/boards")
+						.header("Authorization", authorization())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
@@ -247,7 +280,8 @@ class TaskControllerTest {
 	}
 
 	private String getColumns(String boardId) throws Exception {
-		return mockMvc.perform(get("/api/boards/{boardId}/columns", boardId))
+		return mockMvc.perform(get("/api/boards/{boardId}/columns", boardId)
+						.header("Authorization", authorization()))
 				.andExpect(status().isOk())
 				.andReturn()
 				.getResponse()
@@ -256,5 +290,13 @@ class TaskControllerTest {
 
 	private String idFromLocation(String location) {
 		return location.substring(location.lastIndexOf('/') + 1);
+	}
+
+	private String authorization() {
+		if (authorization == null) {
+			authorization = TestAuth.bearerToken(userRepository, passwordEncoder, jwtService);
+		}
+
+		return authorization;
 	}
 }

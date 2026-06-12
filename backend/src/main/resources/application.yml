@@ -17,3 +17,9 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+
+taskforge:
+  jwt:
+    # Development-only default. Override TASKFORGE_JWT_SECRET outside local dev.
+    secret: ${TASKFORGE_JWT_SECRET:taskforge-dev-jwt-secret-change-me-minimum-32-characters}
+    expiration: ${TASKFORGE_JWT_EXPIRATION:PT8H}
