@@ -90,6 +90,12 @@ export class TaskCardComponent {
     });
   }
 
+  protected confirmDelete(): void {
+    if (window.confirm('Supprimer cette tache ?')) {
+      this.taskDelete.emit(this.task);
+    }
+  }
+
   private resetEditFields(): void {
     this.editTitle = this.task.title;
     this.editDescription = this.task.description ?? '';

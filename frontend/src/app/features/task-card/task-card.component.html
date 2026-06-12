@@ -98,7 +98,7 @@
       <button
         type="button"
         class="danger-button"
-        (click)="taskDelete.emit(task)"
+        (click)="confirmDelete()"
         [disabled]="deleting || updating"
       >
         {{ deleting ? 'Suppression...' : 'Supprimer' }}

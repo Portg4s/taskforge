@@ -73,6 +73,7 @@ describe('App', () => {
 
   afterEach(() => {
     httpTesting.verify();
+    vi.restoreAllMocks();
     localStorage.clear();
   });
 
@@ -466,8 +467,36 @@ describe('App', () => {
     const existingTaskCard = Array.from(compiled.querySelectorAll<HTMLElement>('.task-card'))
       .find((card) => card.textContent?.includes('Task existante'));
     expect(existingTaskCard).toBeTruthy();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
     existingTaskCard!.querySelector<HTMLButtonElement>('.danger-button')!.click();
 
+    const deleteRequest = httpTesting.expectOne('/api/tasks/task-1');
+    expect(deleteRequest.request.method).toBe('DELETE');
+    deleteRequest.flush(null);
+    fixture.detectChanges();
+
+    expect(compiled.textContent).not.toContain('Task existante');
+  });
+
+  it('should not delete a task when confirmation is cancelled', () => {
+    const { fixture, compiled } = openBoardWithTask();
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    compiled.querySelector<HTMLButtonElement>('.danger-button')!.click();
+    fixture.detectChanges();
+
+    expect(window.confirm).toHaveBeenCalledWith('Supprimer cette tache ?');
+    httpTesting.expectNone('/api/tasks/task-1');
+    expect(compiled.textContent).toContain('Task existante');
+  });
+
+  it('should delete a task when confirmation is accepted', () => {
+    const { fixture, compiled } = openBoardWithTask();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    compiled.querySelector<HTMLButtonElement>('.danger-button')!.click();
+
+    expect(window.confirm).toHaveBeenCalledWith('Supprimer cette tache ?');
     const deleteRequest = httpTesting.expectOne('/api/tasks/task-1');
     expect(deleteRequest.request.method).toBe('DELETE');
     deleteRequest.flush(null);
