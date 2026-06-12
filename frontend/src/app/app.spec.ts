@@ -3,10 +3,47 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { App } from './app';
 
+const selectedProjectStorageKey = 'taskforge.selectedProjectId';
+const selectedBoardStorageKey = 'taskforge.selectedBoardId';
+
+function buildProject(id = 'project-1', name = 'Projet Alpha') {
+  return {
+    id,
+    name,
+    description: null,
+    ownerId: 'owner-1',
+    createdAt: '2026-06-11T09:00:00Z',
+    updatedAt: '2026-06-11T09:00:00Z',
+  };
+}
+
+function buildBoard(id = 'board-1', projectId = 'project-1', name = 'Board Produit') {
+  return {
+    id,
+    name,
+    projectId,
+    columns: [],
+    createdAt: '2026-06-11T09:20:00Z',
+    updatedAt: '2026-06-11T09:20:00Z',
+  };
+}
+
+function buildColumn(id = 'column-1', name = 'Todo') {
+  return {
+    id,
+    name,
+    position: 0,
+    createdAt: '2026-06-11T09:20:00Z',
+    updatedAt: '2026-06-11T09:20:00Z',
+  };
+}
+
 describe('App', () => {
   let httpTesting: HttpTestingController;
 
   beforeEach(async () => {
+    localStorage.clear();
+
     await TestBed.configureTestingModule({
       imports: [App],
       providers: [
@@ -20,6 +57,7 @@ describe('App', () => {
 
   afterEach(() => {
     httpTesting.verify();
+    localStorage.clear();
   });
 
   it('should create the app', () => {
@@ -105,6 +143,8 @@ describe('App', () => {
     boardsRequest.flush([]);
     fixture.detectChanges();
 
+    expect(localStorage.getItem(selectedProjectStorageKey)).toBe('project-2');
+    expect(localStorage.getItem(selectedBoardStorageKey)).toBeNull();
     expect(compiled.textContent).toContain('Projet Beta');
     expect(compiled.textContent).not.toContain('Creation...');
     expect(input!.value).toBe('');
@@ -183,10 +223,95 @@ describe('App', () => {
     tasksRequest.flush([]);
     fixture.detectChanges();
 
+    expect(localStorage.getItem(selectedProjectStorageKey)).toBe('project-1');
+    expect(localStorage.getItem(selectedBoardStorageKey)).toBe('board-1');
     expect(compiled.textContent).toContain('Board Produit');
     expect(compiled.textContent).toContain('Todo');
     expect(compiled.textContent).not.toContain('Creation...');
     expect(input!.value).toBe('');
+  });
+
+  it('should restore an existing selected project from localStorage on startup', () => {
+    localStorage.setItem(selectedProjectStorageKey, 'project-1');
+    const fixture = TestBed.createComponent(App);
+
+    fixture.detectChanges();
+
+    httpTesting.expectOne('/api/projects').flush([
+      buildProject('project-1', 'Projet Alpha'),
+      buildProject('project-2', 'Projet Beta'),
+    ]);
+
+    const boardsRequest = httpTesting.expectOne('/api/projects/project-1/boards');
+    expect(boardsRequest.request.method).toBe('GET');
+    boardsRequest.flush([]);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('Projet Alpha');
+    expect(localStorage.getItem(selectedProjectStorageKey)).toBe('project-1');
+  });
+
+  it('should restore an existing selected board from localStorage after loading boards', () => {
+    localStorage.setItem(selectedProjectStorageKey, 'project-1');
+    localStorage.setItem(selectedBoardStorageKey, 'board-2');
+    const fixture = TestBed.createComponent(App);
+
+    fixture.detectChanges();
+
+    httpTesting.expectOne('/api/projects').flush([buildProject()]);
+    httpTesting.expectOne('/api/projects/project-1/boards').flush([
+      buildBoard('board-1', 'project-1', 'Board Produit'),
+      buildBoard('board-2', 'project-1', 'Board Technique'),
+    ]);
+
+    const columnsRequest = httpTesting.expectOne('/api/boards/board-2/columns');
+    expect(columnsRequest.request.method).toBe('GET');
+    columnsRequest.flush([buildColumn()]);
+
+    const tasksRequest = httpTesting.expectOne('/api/boards/board-2/tasks');
+    expect(tasksRequest.request.method).toBe('GET');
+    tasksRequest.flush([]);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).toContain('Board Technique');
+    expect(compiled.textContent).toContain('Todo');
+    expect(localStorage.getItem(selectedProjectStorageKey)).toBe('project-1');
+    expect(localStorage.getItem(selectedBoardStorageKey)).toBe('board-2');
+  });
+
+  it('should clean stale stored selection ids without displaying an error', () => {
+    localStorage.setItem(selectedProjectStorageKey, 'missing-project');
+    localStorage.setItem(selectedBoardStorageKey, 'missing-board');
+    const fixture = TestBed.createComponent(App);
+
+    fixture.detectChanges();
+
+    httpTesting.expectOne('/api/projects').flush([buildProject()]);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.error-message')).toBeNull();
+    expect(localStorage.getItem(selectedProjectStorageKey)).toBeNull();
+    expect(localStorage.getItem(selectedBoardStorageKey)).toBeNull();
+  });
+
+  it('should clean a stale stored board id after restoring its project', () => {
+    localStorage.setItem(selectedProjectStorageKey, 'project-1');
+    localStorage.setItem(selectedBoardStorageKey, 'missing-board');
+    const fixture = TestBed.createComponent(App);
+
+    fixture.detectChanges();
+
+    httpTesting.expectOne('/api/projects').flush([buildProject()]);
+    httpTesting.expectOne('/api/projects/project-1/boards').flush([buildBoard()]);
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.error-message')).toBeNull();
+    expect(localStorage.getItem(selectedProjectStorageKey)).toBe('project-1');
+    expect(localStorage.getItem(selectedBoardStorageKey)).toBeNull();
   });
 
   it('should display board tasks and create a task in a column', () => {

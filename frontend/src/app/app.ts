@@ -14,6 +14,10 @@ import { BoardColumnsComponent, CreateTaskEvent, MoveTaskEvent } from './feature
 import { BoardPanelComponent } from './features/board-panel/board-panel.component';
 import { ProjectPanelComponent } from './features/project-panel/project-panel.component';
 
+interface SelectProjectOptions {
+  restoreStoredBoard?: boolean;
+}
+
 @Component({
   selector: 'app-root',
   imports: [CommonModule, BoardColumnsComponent, BoardPanelComponent, ProjectPanelComponent],
@@ -25,6 +29,8 @@ export class App implements OnInit {
   private readonly projectApi = inject(ProjectApiService);
   private readonly boardApi = inject(BoardApiService);
   private readonly taskApi = inject(TaskApiService);
+  private readonly selectedProjectStorageKey = 'taskforge.selectedProjectId';
+  private readonly selectedBoardStorageKey = 'taskforge.selectedBoardId';
 
   protected readonly projects = signal<Project[]>([]);
   protected readonly boards = signal<Board[]>([]);
@@ -57,6 +63,7 @@ export class App implements OnInit {
       .subscribe({
         next: (projects) => {
           this.projects.set(projects);
+          this.restoreStoredProject(projects);
         },
         error: (error: unknown) => {
           this.setError('Impossible de charger les projets.', error);
@@ -82,13 +89,18 @@ export class App implements OnInit {
       });
   }
 
-  protected selectProject(project: Project): void {
+  protected selectProject(project: Project, options: SelectProjectOptions = {}): void {
+    localStorage.setItem(this.selectedProjectStorageKey, project.id);
+    if (options.restoreStoredBoard !== true) {
+      localStorage.removeItem(this.selectedBoardStorageKey);
+    }
+
     this.selectedProject.set(project);
     this.selectedBoard.set(null);
     this.boards.set([]);
     this.columns.set([]);
     this.tasks.set([]);
-    this.loadBoards(project.id);
+    this.loadBoards(project.id, options.restoreStoredBoard === true ? localStorage.getItem(this.selectedBoardStorageKey) : null);
   }
 
   protected createBoard(name: string): void {
@@ -116,6 +128,7 @@ export class App implements OnInit {
   }
 
   protected selectBoard(board: Board): void {
+    localStorage.setItem(this.selectedBoardStorageKey, board.id);
     this.selectedBoard.set(board);
     this.columns.set([]);
     this.tasks.set([]);
@@ -180,7 +193,7 @@ export class App implements OnInit {
       });
   }
 
-  private loadBoards(projectId: string): void {
+  private loadBoards(projectId: string, boardIdToRestore: string | null = null): void {
     this.loadingBoards.set(true);
     this.errorMessage.set('');
 
@@ -190,6 +203,9 @@ export class App implements OnInit {
       .subscribe({
         next: (boards) => {
           this.boards.set(boards);
+          if (boardIdToRestore !== null) {
+            this.restoreStoredBoard(boards, boardIdToRestore);
+          }
         },
         error: (error: unknown) => {
           this.setError('Impossible de charger les boards.', error);
@@ -236,6 +252,32 @@ export class App implements OnInit {
     if (board !== null) {
       this.loadTasks(board.id);
     }
+  }
+
+  private restoreStoredProject(projects: Project[]): void {
+    const projectId = localStorage.getItem(this.selectedProjectStorageKey);
+    if (projectId === null) {
+      return;
+    }
+
+    const project = projects.find((candidate) => candidate.id === projectId);
+    if (project === undefined) {
+      localStorage.removeItem(this.selectedProjectStorageKey);
+      localStorage.removeItem(this.selectedBoardStorageKey);
+      return;
+    }
+
+    this.selectProject(project, { restoreStoredBoard: true });
+  }
+
+  private restoreStoredBoard(boards: Board[], boardId: string): void {
+    const board = boards.find((candidate) => candidate.id === boardId);
+    if (board === undefined) {
+      localStorage.removeItem(this.selectedBoardStorageKey);
+      return;
+    }
+
+    this.selectBoard(board);
   }
 
   private tasksForColumn(columnId: string): Task[] {
