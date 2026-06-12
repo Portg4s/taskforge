@@ -136,6 +136,10 @@ git status
 
 ## Fonctionnalites disponibles
 
+- Inscription utilisateur.
+- Connexion et deconnexion.
+- Authentification JWT avec token Bearer.
+- Restauration de session via token stocke localement.
 - Creer et lister des projets.
 - Creer et lister des boards.
 - Afficher les colonnes d'un board.
@@ -145,9 +149,29 @@ git status
 - Supprimer une task avec confirmation.
 - Restaurer la selection projet / board apres refresh navigateur via `localStorage`.
 
+## Authentification
+
+L'API expose les endpoints publics suivants :
+
+```text
+POST /api/auth/register
+POST /api/auth/login
+```
+
+L'utilisateur courant peut etre recupere avec un JWT valide :
+
+```text
+GET /api/auth/me
+```
+
+Les endpoints metier `/api/**` necessitent un header :
+
+```text
+Authorization: Bearer <token>
+```
+
 ## Roadmap courte
 
-- Authentification JWT.
 - Meilleure UI.
 - Drag & drop pour les tasks.
 - Assignation utilisateurs.
@@ -156,6 +180,6 @@ git status
 ## Notes importantes
 
 - Le projet est actuellement configure pour un environnement de developpement.
-- Spring Security est present, mais l'authentification applicative complete n'est pas encore active.
+- L'authentification applicative JWT est active cote backend et frontend.
 - Les credentials Docker sont des valeurs de developpement et ne doivent pas etre reutilises en production.
 - Ne pas commiter de secrets, tokens, mots de passe reels ou fichiers d'environnement locaux.
