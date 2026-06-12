@@ -4,50 +4,69 @@
       <p class="eyebrow">TaskForge</p>
       <h1>Projets et boards</h1>
     </div>
-    <button type="button" class="secondary-button" (click)="loadProjects()" [disabled]="loadingProjects()">
-      Rafraichir
-    </button>
+    @if (authSession.currentUser(); as user) {
+      <div class="user-actions">
+        <span>Connecte en tant que {{ user.displayName }} ({{ user.email }})</span>
+        <button type="button" class="secondary-button" (click)="loadProjects()" [disabled]="loadingProjects()">
+          Rafraichir
+        </button>
+        <button type="button" class="secondary-button" (click)="logout()">
+          Deconnexion
+        </button>
+      </div>
+    }
   </header>
 
   @if (errorMessage()) {
     <p class="error-message">{{ errorMessage() }}</p>
   }
 
-  <section class="workspace">
-    <app-project-panel
-      [projects]="projects()"
-      [selectedProject]="selectedProject()"
-      [loading]="loadingProjects()"
-      [saving]="savingProject()"
-      (refresh)="loadProjects()"
-      (projectCreate)="createProject($event)"
-      (projectSelect)="selectProject($event)"
-    />
+  @if (restoringSession()) {
+    <p class="empty-state centered-state">Chargement...</p>
+  } @else if (authSession.currentUser()) {
+    <section class="workspace">
+      <app-project-panel
+        [projects]="projects()"
+        [selectedProject]="selectedProject()"
+        [loading]="loadingProjects()"
+        [saving]="savingProject()"
+        (refresh)="loadProjects()"
+        (projectCreate)="createProject($event)"
+        (projectSelect)="selectProject($event)"
+      />
 
-    <app-board-panel
-      [selectedProject]="selectedProject()"
-      [boards]="boards()"
-      [selectedBoard]="selectedBoard()"
-      [loading]="loadingBoards()"
-      [saving]="savingBoard()"
-      (boardCreate)="createBoard($event)"
-      (boardSelect)="selectBoard($event)"
-    />
+      <app-board-panel
+        [selectedProject]="selectedProject()"
+        [boards]="boards()"
+        [selectedBoard]="selectedBoard()"
+        [loading]="loadingBoards()"
+        [saving]="savingBoard()"
+        (boardCreate)="createBoard($event)"
+        (boardSelect)="selectBoard($event)"
+      />
 
-    <app-board-columns
-      [selectedBoard]="selectedBoard()"
-      [columns]="columns()"
-      [tasks]="tasks()"
-      [loadingColumns]="loadingColumns()"
-      [loadingTasks]="loadingTasks()"
-      [savingTaskColumnId]="savingTaskColumnId()"
-      [updatingTaskId]="updatingTaskId()"
-      [movingTaskId]="movingTaskId()"
-      [deletingTaskId]="deletingTaskId()"
-      (taskCreate)="createTask($event)"
-      (taskUpdate)="updateTask($event)"
-      (taskMove)="moveTask($event)"
-      (taskDelete)="deleteTask($event)"
+      <app-board-columns
+        [selectedBoard]="selectedBoard()"
+        [columns]="columns()"
+        [tasks]="tasks()"
+        [loadingColumns]="loadingColumns()"
+        [loadingTasks]="loadingTasks()"
+        [savingTaskColumnId]="savingTaskColumnId()"
+        [updatingTaskId]="updatingTaskId()"
+        [movingTaskId]="movingTaskId()"
+        [deletingTaskId]="deletingTaskId()"
+        (taskCreate)="createTask($event)"
+        (taskUpdate)="updateTask($event)"
+        (taskMove)="moveTask($event)"
+        (taskDelete)="deleteTask($event)"
+      />
+    </section>
+  } @else {
+    <app-auth-panel
+      [loading]="authLoading()"
+      [apiErrorMessage]="errorMessage()"
+      (loginSubmit)="login($event)"
+      (registerSubmit)="register($event)"
     />
-  </section>
+  }
 </main>

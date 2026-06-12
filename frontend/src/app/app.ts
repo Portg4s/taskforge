@@ -5,11 +5,14 @@ import { finalize } from 'rxjs';
 
 import { BoardColumn } from './core/models/board-column.model';
 import { Board } from './core/models/board.model';
+import { LoginRequest, RegisterRequest } from './core/models/auth.model';
 import { CreateProjectRequest, Project } from './core/models/project.model';
 import { Task } from './core/models/task.model';
+import { AuthSessionService } from './core/services/auth-session.service';
 import { BoardApiService } from './core/services/board-api.service';
 import { ProjectApiService } from './core/services/project-api.service';
 import { TaskApiService } from './core/services/task-api.service';
+import { AuthPanelComponent } from './features/auth-panel/auth-panel.component';
 import { BoardColumnsComponent, CreateTaskEvent, MoveTaskEvent } from './features/board-columns/board-columns.component';
 import { BoardPanelComponent } from './features/board-panel/board-panel.component';
 import { ProjectPanelComponent } from './features/project-panel/project-panel.component';
@@ -21,12 +24,13 @@ interface SelectProjectOptions {
 
 @Component({
   selector: 'app-root',
-  imports: [CommonModule, BoardColumnsComponent, BoardPanelComponent, ProjectPanelComponent],
+  imports: [CommonModule, AuthPanelComponent, BoardColumnsComponent, BoardPanelComponent, ProjectPanelComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss',
   encapsulation: ViewEncapsulation.None,
 })
 export class App implements OnInit {
+  protected readonly authSession = inject(AuthSessionService);
   private readonly projectApi = inject(ProjectApiService);
   private readonly boardApi = inject(BoardApiService);
   private readonly taskApi = inject(TaskApiService);
@@ -43,6 +47,8 @@ export class App implements OnInit {
   protected readonly loadingBoards = signal(false);
   protected readonly loadingColumns = signal(false);
   protected readonly loadingTasks = signal(false);
+  protected readonly restoringSession = signal(false);
+  protected readonly authLoading = signal(false);
   protected readonly savingProject = signal(false);
   protected readonly savingBoard = signal(false);
   protected readonly savingTaskColumnId = signal<string | null>(null);
@@ -52,10 +58,56 @@ export class App implements OnInit {
   protected readonly errorMessage = signal('');
 
   ngOnInit(): void {
-    this.loadProjects();
+    this.restoreSession();
+  }
+
+  protected login(request: LoginRequest): void {
+    this.authLoading.set(true);
+    this.errorMessage.set('');
+
+    this.authSession
+      .login(request)
+      .pipe(finalize(() => this.authLoading.set(false)))
+      .subscribe({
+        next: () => {
+          this.resetDashboardState();
+          this.loadProjects();
+        },
+        error: (error: unknown) => {
+          this.setError('Impossible de se connecter.', error);
+        },
+      });
+  }
+
+  protected register(request: RegisterRequest): void {
+    this.authLoading.set(true);
+    this.errorMessage.set('');
+
+    this.authSession
+      .register(request)
+      .pipe(finalize(() => this.authLoading.set(false)))
+      .subscribe({
+        next: () => {
+          this.resetDashboardState();
+          this.loadProjects();
+        },
+        error: (error: unknown) => {
+          this.setAuthError('Impossible de creer le compte.', error);
+        },
+      });
+  }
+
+  protected logout(): void {
+    this.authSession.logout();
+    this.resetDashboardState();
+    this.errorMessage.set('');
   }
 
   protected loadProjects(): void {
+    if (this.authSession.currentUser() === null) {
+      return;
+    }
+
     this.loadingProjects.set(true);
     this.errorMessage.set('');
 
@@ -274,6 +326,34 @@ export class App implements OnInit {
     }
   }
 
+  private restoreSession(): void {
+    const hadStoredToken = this.authSession.token() !== null;
+    if (!hadStoredToken) {
+      return;
+    }
+
+    this.restoringSession.set(true);
+    this.authSession
+      .restoreSession()
+      .pipe(finalize(() => this.restoringSession.set(false)))
+      .subscribe({
+        next: (user) => {
+          if (user === null) {
+            this.resetDashboardState();
+            this.errorMessage.set('Session expiree. Reconnecte-toi.');
+            return;
+          }
+
+          this.loadProjects();
+        },
+        error: () => {
+          this.authSession.expireSession();
+          this.resetDashboardState();
+          this.errorMessage.set('Session expiree. Reconnecte-toi.');
+        },
+      });
+  }
+
   private restoreStoredProject(projects: Project[]): void {
     const projectId = localStorage.getItem(this.selectedProjectStorageKey);
     if (projectId === null) {
@@ -305,11 +385,55 @@ export class App implements OnInit {
   }
 
   private setError(fallback: string, error: unknown): void {
+    if (error instanceof HttpErrorResponse && error.status === 401) {
+      this.authSession.expireSession();
+      this.resetDashboardState();
+      this.errorMessage.set('Session expiree. Reconnecte-toi.');
+      return;
+    }
+
     if (error instanceof HttpErrorResponse && typeof error.error?.message === 'string') {
       this.errorMessage.set(error.error.message);
       return;
     }
 
     this.errorMessage.set(fallback);
+  }
+
+  private setAuthError(fallback: string, error: unknown): void {
+    if (error instanceof HttpErrorResponse && typeof error.error?.message === 'string') {
+      const message = error.error.message;
+      if (message === 'Email already registered') {
+        this.errorMessage.set('Email deja utilise.');
+        return;
+      }
+      if (message.toLowerCase().includes('password')) {
+        this.errorMessage.set('Mot de passe trop court.');
+        return;
+      }
+    }
+
+    this.setError(fallback, error);
+  }
+
+  private resetDashboardState(): void {
+    this.projects.set([]);
+    this.boards.set([]);
+    this.columns.set([]);
+    this.tasks.set([]);
+    this.selectedProject.set(null);
+    this.selectedBoard.set(null);
+    this.loadingProjects.set(false);
+    this.loadingBoards.set(false);
+    this.loadingColumns.set(false);
+    this.loadingTasks.set(false);
+    this.savingProject.set(false);
+    this.savingBoard.set(false);
+    this.savingTaskColumnId.set(null);
+    this.updatingTaskId.set(null);
+    this.movingTaskId.set(null);
+    this.deletingTaskId.set(null);
+    localStorage.removeItem(this.selectedProjectStorageKey);
+    localStorage.removeItem(this.selectedBoardStorageKey);
   }
 }

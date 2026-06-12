@@ -1,0 +1,54 @@
+<section class="auth-wrap">
+  <article class="panel auth-panel">
+    <div class="panel-heading">
+      <h2>{{ mode === 'login' ? 'Connexion' : 'Inscription' }}</h2>
+    </div>
+
+    <div class="auth-tabs">
+      <button
+        type="button"
+        class="secondary-button"
+        [class.selected]="mode === 'login'"
+        (click)="setMode('login')"
+      >
+        Connexion
+      </button>
+      <button
+        type="button"
+        class="secondary-button"
+        [class.selected]="mode === 'register'"
+        (click)="setMode('register')"
+      >
+        Inscription
+      </button>
+    </div>
+
+    <form class="stacked-form auth-form" (submit)="submit(); $event.preventDefault()">
+      @if (formErrorMessage) {
+        <p class="form-error">{{ formErrorMessage }}</p>
+      } @else if (apiErrorMessage) {
+        <p class="form-error">{{ apiErrorMessage }}</p>
+      }
+
+      <label for="auth-email">Email</label>
+      <input id="auth-email" type="email" [formControl]="email" autocomplete="email">
+
+      <label for="auth-password">Mot de passe</label>
+      <input
+        id="auth-password"
+        type="password"
+        [formControl]="password"
+        [autocomplete]="mode === 'login' ? 'current-password' : 'new-password'"
+      >
+
+      @if (mode === 'register') {
+        <label for="auth-display-name">Nom affiche</label>
+        <input id="auth-display-name" type="text" [formControl]="displayName" autocomplete="name">
+      }
+
+      <button type="submit" [disabled]="loading">
+        {{ mode === 'login' ? 'Se connecter' : 'Creer un compte' }}
+      </button>
+    </form>
+  </article>
+</section>
